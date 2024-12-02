@@ -18,7 +18,7 @@ cd "$base_dir"
 # pwd
 cd ./Firecrawl/
 
-docker-compose up -d > /dev/null 2>&1 &
+docker-compose up -d > /dev/null 2>&1
 
 # ===========
 
@@ -37,4 +37,4 @@ cd "$base_dir"
 # pwd
 cd ./Ollama/
 
-docker-compose up -d > /dev/null 2>&1 &
+docker-compose up -d > /dev/null 2>&1
