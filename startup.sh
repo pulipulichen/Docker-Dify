@@ -14,15 +14,6 @@ docker-compose up --build -d > /dev/null 2>&1 &
 
 # ===========
 
-echo $base_dir
-cd "$base_dir"
-# pwd
-cd ./Ollama/
-
-docker-compose up -d > /dev/null 2>&1 &
-
-# ===========
-
 cd "$base_dir"
 # pwd
 cd ./Firecrawl/
@@ -36,3 +27,14 @@ cd "$base_dir"
 cd ./SearXNG/
 
 bash ./docker.sh > /dev/null 2>&1 &
+
+# ===========
+
+sleep 5
+
+echo $base_dir
+cd "$base_dir"
+# pwd
+cd ./Ollama/
+
+docker-compose up -d > /dev/null 2>&1 &
