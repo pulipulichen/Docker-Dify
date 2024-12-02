@@ -2,7 +2,7 @@
 
 cd "$(dirname "$0")"
 
-git pull
-git reset --hard HEAD
+git fetch origin
+git reset --hard origin/main
 
 docker-compose up --build
