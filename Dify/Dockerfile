@@ -1,1 +1,0 @@
-FROM jdkelley/simple-http-server:latest
