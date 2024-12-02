@@ -1,0 +1,4 @@
+name: jina-reranker-v2-base-multilingual
+backend: rerankers
+parameters:
+  model: huggingface://jinaai/jina-reranker-v2-base-multilingual/model.safetensors
