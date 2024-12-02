@@ -8,5 +8,5 @@ services:
       - ./entrypoint.sh:/entrypoint.sh
     ports:
       - "11434:11434"
-    restart: unless-stopped
+    restart: always
     entrypoint: ["/usr/bin/bash", "/entrypoint.sh"]
