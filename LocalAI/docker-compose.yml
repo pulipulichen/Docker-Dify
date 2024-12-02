@@ -1,0 +1,8 @@
+version: '3.8'
+
+services:
+  local-ai:
+    image: localai/localai:latest-aio-cpu
+    ports:
+      - "38080:8080"
+    tty: true
