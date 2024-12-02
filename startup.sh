@@ -1,6 +1,7 @@
 #!/bin/bash
 
-base_dir="$(dirname(realpath "$0"))"
+full_path=$(realpath "$0")
+base_dir=$(dirname "$full_path")
 cd "$base_dir"
 
 git clean -f -d
