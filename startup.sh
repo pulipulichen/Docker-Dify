@@ -8,4 +8,4 @@ git reset --hard origin/main
 
 cd ./Dify/docker
 
-docker-compose up --build
+docker-compose up --build > /dev/null 2>&1
