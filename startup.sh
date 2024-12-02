@@ -10,6 +10,20 @@ cd ./Dify/docker
 
 docker-compose up --build -d > /dev/null 2>&1 &
 
+# ===========
+
 cd ./../Ollama/
 
 docker-compose up -d > /dev/null 2>&1 &
+
+# ===========
+
+cd ./../Firecrawl/
+
+docker-compose up -d > /dev/null 2>&1 &
+
+# ===========
+
+cd ./../SearXNG/
+
+./docker.sh > /dev/null 2>&1 &
