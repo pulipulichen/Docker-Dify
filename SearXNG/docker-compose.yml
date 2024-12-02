@@ -73,7 +73,7 @@ services:
 networks:
   searxng:
 
-volumes:
-  caddy-data:
-  caddy-config:
-  valkey-data2:
+# volumes:
+#   caddy-data:
+#   caddy-config:
+#   valkey-data2:
