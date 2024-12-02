@@ -8,4 +8,5 @@ services:
     ports:
       - "11434:11434"
     command: 
-      - echo "ok"
+      - | 
+        echo "ok"
