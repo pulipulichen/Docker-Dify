@@ -1,0 +1,68 @@
+version: '3.7'
+
+services:
+  #加上restart參數會在開機後自動啟動。
+  caddy:
+    container_name: caddy
+    image: caddy:2-alpine
+    network_mode: host
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data::/data:rw
+      - caddy-config::/config:rw
+    environment:
+      - SEARXNG_HOSTNAME=${SEARXNG_HOSTNAME:-http://localhost:80}
+      - SEARXNG_TLS=${LETSENCRYPT_EMAIL:-internal}
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - DAC_OVERRIDE # 修正權限問題
+
+  redis:
+    container_name: redis
+    image: "redis:alpine"
+    command: redis-server --save "" --appendonly "no"
+    networks:
+      - searxng
+    tmpfs:
+      - /var/lib/redis
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETGID
+      - SETUID
+      - DAC_OVERRIDE # 修正權限問題
+
+  searxng:
+    container_name: searxng
+    image: searxng/searxng:latest
+    networks:
+      - searxng
+    ports: # 冒號左邊是對外開放的通訊埠，我改成8081
+     - "40001:8080"
+    volumes:
+      - ./searxng:/etc/searxng:rw
+    environment: # environment服務的網址，如果架在本機就不需要啟用HTTPS
+      - SEARXNG_BASE_URL=https://${SEARXNG_HOSTNAME:-localhost}/
+    privileged: true # 如果發生權限錯誤，試著加這條
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - DAC_OVERRIDE # 修正權限問題
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "1"
+networks:
+  searxng:
+    ipam:
+      driver: default
+
+volumes:
+  caddy-data:
+  caddy-config:
