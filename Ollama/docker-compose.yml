@@ -7,8 +7,8 @@ services:
       - ./ollama:/root/.ollama
     ports:
       - "11434:11434"
-    command: >
-      echo "ok"
+    command: 
+      - echo "ok"
     # networks:
     #   - ollama-docker
   # ollama-webui:
