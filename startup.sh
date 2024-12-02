@@ -12,18 +12,21 @@ docker-compose up --build -d > /dev/null 2>&1 &
 
 # ===========
 
-cd ./../Ollama/
+cd "$(dirname "$0")"
+cd ./Ollama/
 
 docker-compose up -d > /dev/null 2>&1 &
 
 # ===========
 
-cd ./../Firecrawl/
+cd "$(dirname "$0")"
+cd ./Firecrawl/
 
 docker-compose up -d > /dev/null 2>&1 &
 
 # ===========
 
-cd ./../SearXNG/
+cd "$(dirname "$0")"
+cd ./SearXNG/
 
-./docker.sh > /dev/null 2>&1 &
+bash ./docker.sh > /dev/null 2>&1 &
