@@ -10,6 +10,7 @@ git reset --hard origin/main
 
 cd ./Dify/docker
 
+docker-compose down
 docker-compose up --build -d > /dev/null 2>&1 &
 
 # ===========
@@ -18,6 +19,7 @@ cd "$base_dir"
 # pwd
 cd ./Firecrawl/
 
+docker-compose down
 docker-compose up -d > /dev/null 2>&1
 
 # ===========
@@ -37,4 +39,7 @@ cd "$base_dir"
 # pwd
 cd ./Ollama/
 
+docker-compose down
 docker-compose up -d > /dev/null 2>&1
+
+sleep 30
