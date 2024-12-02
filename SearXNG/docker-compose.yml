@@ -31,7 +31,7 @@ services:
     networks:
       - searxng
     volumes:
-      - valkey-data2:/data
+      - ./valkey-data2:/data
     cap_drop:
       - ALL
     cap_add:
