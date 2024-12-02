@@ -6,4 +6,6 @@ git clean -f -d
 git fetch origin
 git reset --hard origin/main
 
+cd ./Dify/docker
+
 docker-compose up --build
