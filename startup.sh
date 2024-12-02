@@ -42,4 +42,4 @@ cd ./Ollama/
 docker-compose down
 docker-compose up -d > /dev/null 2>&1
 
-sleep 30
+# sleep 30
