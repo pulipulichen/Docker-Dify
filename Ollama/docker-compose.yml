@@ -8,8 +8,7 @@ services:
     ports:
       - "11434:11434"
     command: >
-      ollama pull jeffh/intfloat-multilingual-e5-large &&
-      ollama serve
+      ollama pull jeffh/intfloat-multilingual-e5-large; ollama serve
     # networks:
     #   - ollama-docker
   # ollama-webui:
