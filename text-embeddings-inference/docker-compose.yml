@@ -4,7 +4,7 @@ services:
   text-embeddings-inference:
     # container_name: text-embeddings-inference
     image: ghcr.io/huggingface/text-embeddings-inference:cpu-0.6
-    command: --model-id Alibaba-NLP/gte-multilingual-reranker-base
+    command: --model-id "Alibaba-NLP/gte-multilingual-reranker-base"
     ports:
       - "38080:80"
     volumes:
