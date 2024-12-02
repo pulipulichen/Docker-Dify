@@ -13,6 +13,7 @@ docker-compose up --build -d > /dev/null 2>&1 &
 
 # ===========
 
+echo $base_dir
 cd "$base_dir"
 pwd
 cd ./Ollama/
