@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  searxng:
+    image: searxng/searxng:2024.12.1-0245e82bd
+    ports:
+      - "40001:8080"
+    volumes:
+      - "./searxng:/etc/searxng"
+    restart: unless-stopped

@@ -28,7 +28,9 @@ cd "$base_dir"
 # pwd
 cd ./SearXNG/
 
-bash ./docker.sh > /dev/null 2>&1 &
+# bash ./docker.sh > /dev/null 2>&1 &
+docker-compose down
+docker-compose up -d > /dev/null 2>&1
 
 # ===========
 
