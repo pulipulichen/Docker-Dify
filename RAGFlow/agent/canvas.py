@@ -21,7 +21,6 @@ from functools import partial
 from agent.component import component_class
 from agent.component.base import ComponentBase
 
-
 class Canvas(ABC):
     """
     dsl = {
@@ -134,8 +133,7 @@ class Canvas(ABC):
             "components": {}
         }
         for k in self.dsl.keys():
-            if k in ["components"]:
-                continue
+            if k in ["components"]:continue
             dsl[k] = deepcopy(self.dsl[k])
 
         for k, cpn in self.components.items():
@@ -160,8 +158,7 @@ class Canvas(ABC):
 
     def get_compnent_name(self, cid):
         for n in self.dsl["graph"]["nodes"]:
-            if cid == n["id"]:
-                return n["data"]["name"]
+            if cid == n["id"]: return n["data"]["name"]
         return ""
 
     def run(self, **kwargs):
@@ -176,8 +173,7 @@ class Canvas(ABC):
             if kwargs.get("stream"):
                 for an in ans():
                     yield an
-            else:
-                yield ans
+            else: yield ans
             return
 
         if not self.path:
@@ -192,8 +188,7 @@ class Canvas(ABC):
         def prepare2run(cpns):
             nonlocal ran, ans
             for c in cpns:
-                if self.path[-1] and c == self.path[-1][-1]:
-                    continue
+                if self.path[-1] and c == self.path[-1][-1]: continue
                 cpn = self.components[c]["obj"]
                 if cpn.component_name == "Answer":
                     self.answer.append(c)
@@ -202,17 +197,10 @@ class Canvas(ABC):
                     if c not in without_dependent_checking:
                         cpids = cpn.get_dependent_components()
                         if any([cc not in self.path[-1] for cc in cpids]):
-                            if c not in waiting:
-                                waiting.append(c)
+                            if c not in waiting: waiting.append(c)
                             continue
                     yield "*'{}'* is running...🕞".format(self.get_compnent_name(c))
-                    try:
-                        ans = cpn.run(self.history, **kwargs)
-                    except Exception as e:
-                        logging.exception(f"Canvas.run got exception: {e}")
-                        self.path[-1].append(c)
-                        ran += 1
-                        raise e
+                    ans = cpn.run(self.history, **kwargs)
                     self.path[-1].append(c)
             ran += 1
 
@@ -223,23 +211,29 @@ class Canvas(ABC):
             logging.debug(f"Canvas.run: {ran} {self.path}")
             cpn_id = self.path[-1][ran]
             cpn = self.get_component(cpn_id)
-            if not cpn["downstream"]:
-                break
+            if not cpn["downstream"]: break
 
             loop = self._find_loop()
-            if loop:
-                raise OverflowError(f"Too much loops: {loop}")
+            if loop: raise OverflowError(f"Too much loops: {loop}")
 
             if cpn["obj"].component_name.lower() in ["switch", "categorize", "relevant"]:
                 switch_out = cpn["obj"].output()[1].iloc[0, 0]
                 assert switch_out in self.components, \
                     "{}'s output: {} not valid.".format(cpn_id, switch_out)
-                for m in prepare2run([switch_out]):
-                    yield {"content": m, "running_status": True}
+                try:
+                    for m in prepare2run([switch_out]):
+                        yield {"content": m, "running_status": True}
+                except Exception as e:
+                    yield {"content": "*Exception*: {}".format(e), "running_status": True}
+                    logging.exception("Canvas.run got exception")
                 continue
 
-            for m in prepare2run(cpn["downstream"]):
-                yield {"content": m, "running_status": True}
+            try:
+                for m in prepare2run(cpn["downstream"]):
+                    yield {"content": m, "running_status": True}
+            except Exception as e:
+                yield {"content": "*Exception*: {}".format(e), "running_status": True}
+                logging.exception("Canvas.run got exception")
 
             if ran >= len(self.path[-1]) and waiting:
                 without_dependent_checking = waiting
@@ -289,22 +283,19 @@ class Canvas(ABC):
 
     def _find_loop(self, max_loops=6):
         path = self.path[-1][::-1]
-        if len(path) < 2:
-            return False
+        if len(path) < 2: return False
 
         for i in range(len(path)):
             if path[i].lower().find("answer") >= 0:
                 path = path[:i]
                 break
 
-        if len(path) < 2:
-            return False
+        if len(path) < 2: return False
 
-        for loc in range(2, len(path) // 2):
-            pat = ",".join(path[0:loc])
+        for l in range(2, len(path) // 2):
+            pat = ",".join(path[0:l])
             path_str = ",".join(path)
-            if len(pat) >= len(path_str):
-                return False
+            if len(pat) >= len(path_str): return False
             loop = max_loops
             while path_str.find(pat) == 0 and loop >= 0:
                 loop -= 1
@@ -312,23 +303,10 @@ class Canvas(ABC):
                     return False
                 path_str = path_str[len(pat)+1:]
             if loop < 0:
-                pat = " => ".join([p.split(":")[0] for p in path[0:loc]])
+                pat = " => ".join([p.split(":")[0] for p in path[0:l]])
                 return pat + " => " + pat
 
         return False
 
     def get_prologue(self):
         return self.components["begin"]["obj"]._param.prologue
-
-    def set_global_param(self, **kwargs):
-        for k, v in kwargs.items():
-            for q in self.components["begin"]["obj"]._param.query:
-                if k != q["key"]:
-                    continue
-                q["value"] = v
-
-    def get_preset_param(self):
-        return self.components["begin"]["obj"]._param.query
-
-    def get_component_input_elements(self, cpnnm):
-        return self.components[cpnnm]["obj"].get_input_elements()

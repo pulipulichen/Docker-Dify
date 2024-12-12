@@ -36,7 +36,7 @@ class RAGFlowHtmlParser:
 
     @classmethod
     def parser_txt(cls, txt):
-        if not isinstance(txt, str):
+        if type(txt) != str:
             raise TypeError("txt type should be str!")
         html_doc = readability.Document(txt)
         title = html_doc.title()

@@ -13,6 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License
 #
+import json
 import os.path
 import pathlib
 import re
@@ -21,25 +22,19 @@ import flask
 from flask import request
 from flask_login import login_required, current_user
 
-from deepdoc.parser.html_parser import RAGFlowHtmlParser
-from rag.nlp import search
-
-from api.db import FileType, TaskStatus, ParserType, FileSource
-from api.db.db_models import File, Task
+from api.db.db_models import Task, File
 from api.db.services.file2document_service import File2DocumentService
 from api.db.services.file_service import FileService
-from api.db.services.task_service import queue_tasks
+from api.db.services.task_service import TaskService, queue_tasks
 from api.db.services.user_service import UserTenantService
+from deepdoc.parser.html_parser import RAGFlowHtmlParser
+from rag.nlp import search
 from api.db.services import duplicate_name
 from api.db.services.knowledgebase_service import KnowledgebaseService
-from api.db.services.task_service import TaskService
-from api.db.services.document_service import DocumentService, doc_upload_and_parse
-from api.utils.api_utils import (
-    server_error_response,
-    get_data_error_result,
-    validate_request,
-)
+from api.utils.api_utils import server_error_response, get_data_error_result, validate_request
 from api.utils import get_uuid
+from api.db import FileType, TaskStatus, ParserType, FileSource
+from api.db.services.document_service import DocumentService, doc_upload_and_parse
 from api import settings
 from api.utils.api_utils import get_json_result
 from rag.utils.storage_factory import STORAGE_IMPL
@@ -48,7 +43,7 @@ from api.utils.web_utils import html2pdf, is_valid_url
 from api.constants import IMG_BASE64_PREFIX
 
 
-@manager.route('/upload', methods=['POST'])  # noqa: F821
+@manager.route('/upload', methods=['POST'])
 @login_required
 @validate_request("kb_id")
 def upload():
@@ -77,7 +72,7 @@ def upload():
     return get_json_result(data=True)
 
 
-@manager.route('/web_crawl', methods=['POST'])  # noqa: F821
+@manager.route('/web_crawl', methods=['POST'])
 @login_required
 @validate_request("kb_id", "name", "url")
 def web_crawl():
@@ -95,8 +90,7 @@ def web_crawl():
         raise LookupError("Can't find this knowledgebase!")
 
     blob = html2pdf(url)
-    if not blob:
-        return server_error_response(ValueError("Download failure."))
+    if not blob: return server_error_response(ValueError("Download failure."))
 
     root_folder = FileService.get_root_folder(current_user.id)
     pf_id = root_folder["id"]
@@ -144,7 +138,7 @@ def web_crawl():
     return get_json_result(data=True)
 
 
-@manager.route('/create', methods=['POST'])  # noqa: F821
+@manager.route('/create', methods=['POST'])
 @login_required
 @validate_request("name", "kb_id")
 def create():
@@ -180,7 +174,7 @@ def create():
         return server_error_response(e)
 
 
-@manager.route('/list', methods=['GET'])  # noqa: F821
+@manager.route('/list', methods=['GET'])
 @login_required
 def list_docs():
     kb_id = request.args.get("kb_id")
@@ -215,7 +209,7 @@ def list_docs():
         return server_error_response(e)
 
 
-@manager.route('/infos', methods=['POST'])  # noqa: F821
+@manager.route('/infos', methods=['POST'])
 @login_required
 def docinfos():
     req = request.json
@@ -231,7 +225,7 @@ def docinfos():
     return get_json_result(data=list(docs.dicts()))
 
 
-@manager.route('/thumbnails', methods=['GET'])  # noqa: F821
+@manager.route('/thumbnails', methods=['GET'])
 # @login_required
 def thumbnails():
     doc_ids = request.args.get("doc_ids").split(",")
@@ -251,7 +245,7 @@ def thumbnails():
         return server_error_response(e)
 
 
-@manager.route('/change_status', methods=['POST'])  # noqa: F821
+@manager.route('/change_status', methods=['POST'])
 @login_required
 @validate_request("doc_id", "status")
 def change_status():
@@ -290,14 +284,13 @@ def change_status():
         return server_error_response(e)
 
 
-@manager.route('/rm', methods=['POST'])  # noqa: F821
+@manager.route('/rm', methods=['POST'])
 @login_required
 @validate_request("doc_id")
 def rm():
     req = request.json
     doc_ids = req["doc_id"]
-    if isinstance(doc_ids, str):
-        doc_ids = [doc_ids]
+    if isinstance(doc_ids, str): doc_ids = [doc_ids]
 
     for doc_id in doc_ids:
         if not DocumentService.accessible4deletion(doc_id, current_user.id):
@@ -322,7 +315,6 @@ def rm():
 
             b, n = File2DocumentService.get_storage_address(doc_id=doc_id)
 
-            TaskService.filter_delete([Task.doc_id == doc_id])
             if not DocumentService.remove_document(doc, tenant_id):
                 return get_data_error_result(
                     message="Database error (Document removal)!")
@@ -341,7 +333,7 @@ def rm():
     return get_json_result(data=True)
 
 
-@manager.route('/run', methods=['POST'])  # noqa: F821
+@manager.route('/run', methods=['POST'])
 @login_required
 @validate_request("doc_ids", "run")
 def run():
@@ -368,12 +360,11 @@ def run():
             e, doc = DocumentService.get_by_id(id)
             if not e:
                 return get_data_error_result(message="Document not found!")
-            if req.get("delete", False):
-                TaskService.filter_delete([Task.doc_id == id])
-                if settings.docStoreConn.indexExist(search.index_name(tenant_id), doc.kb_id):
-                    settings.docStoreConn.delete({"doc_id": id}, search.index_name(tenant_id), doc.kb_id)
+            if settings.docStoreConn.indexExist(search.index_name(tenant_id), doc.kb_id):
+                settings.docStoreConn.delete({"doc_id": id}, search.index_name(tenant_id), doc.kb_id)
 
             if str(req["run"]) == TaskStatus.RUNNING.value:
+                TaskService.filter_delete([Task.doc_id == id])
                 e, doc = DocumentService.get_by_id(id)
                 doc = doc.to_dict()
                 doc["tenant_id"] = tenant_id
@@ -385,7 +376,7 @@ def run():
         return server_error_response(e)
 
 
-@manager.route('/rename', methods=['POST'])  # noqa: F821
+@manager.route('/rename', methods=['POST'])
 @login_required
 @validate_request("doc_id", "name")
 def rename():
@@ -426,7 +417,7 @@ def rename():
         return server_error_response(e)
 
 
-@manager.route('/get/<doc_id>', methods=['GET'])  # noqa: F821
+@manager.route('/get/<doc_id>', methods=['GET'])
 # @login_required
 def get(doc_id):
     try:
@@ -451,7 +442,7 @@ def get(doc_id):
         return server_error_response(e)
 
 
-@manager.route('/change_parser', methods=['POST'])  # noqa: F821
+@manager.route('/change_parser', methods=['POST'])
 @login_required
 @validate_request("doc_id", "parser_id")
 def change_parser():
@@ -502,13 +493,10 @@ def change_parser():
         return server_error_response(e)
 
 
-@manager.route('/image/<image_id>', methods=['GET'])  # noqa: F821
+@manager.route('/image/<image_id>', methods=['GET'])
 # @login_required
 def get_image(image_id):
     try:
-        arr = image_id.split("-")
-        if len(arr) != 2:
-            return get_data_error_result(message="Image not found.")
         bkt, nm = image_id.split("-")
         response = flask.make_response(STORAGE_IMPL.get(bkt, nm))
         response.headers.set('Content-Type', 'image/JPEG')
@@ -517,7 +505,7 @@ def get_image(image_id):
         return server_error_response(e)
 
 
-@manager.route('/upload_and_parse', methods=['POST'])  # noqa: F821
+@manager.route('/upload_and_parse', methods=['POST'])
 @login_required
 @validate_request("conversation_id")
 def upload_and_parse():
@@ -536,7 +524,7 @@ def upload_and_parse():
     return get_json_result(data=doc_ids)
 
 
-@manager.route('/parse', methods=['POST'])  # noqa: F821
+@manager.route('/parse', methods=['POST'])
 @login_required
 def parse():
     url = request.json.get("url") if request.json else ""
@@ -560,7 +548,7 @@ def parse():
         })
         driver = Chrome(options=options)
         driver.get(url)
-        res_headers = [r.response.headers for r in driver.requests if r and r.response]
+        res_headers = [r.response.headers for r in driver.requests]
         if len(res_headers) > 1:
             sections = RAGFlowHtmlParser().parser_txt(driver.page_source)
             driver.quit()

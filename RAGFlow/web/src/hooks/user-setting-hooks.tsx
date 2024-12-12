@@ -169,34 +169,17 @@ export const useFetchSystemStatus = () => {
   };
 };
 
-export const useFetchManualSystemTokenList = () => {
-  const {
-    data,
-    isPending: loading,
-    mutateAsync,
-  } = useMutation({
-    mutationKey: ['fetchManualSystemTokenList'],
-    mutationFn: async () => {
-      const { data } = await userService.listToken();
-
-      return data?.data ?? [];
-    },
-  });
-
-  return { data, loading, fetchSystemTokenList: mutateAsync };
-};
-
-export const useFetchSystemTokenList = () => {
+export const useFetchSystemTokenList = (params: Record<string, any>) => {
   const {
     data,
     isFetching: loading,
     refetch,
   } = useQuery<IToken[]>({
-    queryKey: ['fetchSystemTokenList'],
+    queryKey: ['fetchSystemTokenList', params],
     initialData: [],
     gcTime: 0,
     queryFn: async () => {
-      const { data } = await userService.listToken();
+      const { data } = await userService.listToken(params);
 
       return data?.data ?? [];
     },
@@ -230,7 +213,6 @@ export const useRemoveSystemToken = () => {
 
 export const useCreateSystemToken = () => {
   const queryClient = useQueryClient();
-
   const {
     data,
     isPending: loading,

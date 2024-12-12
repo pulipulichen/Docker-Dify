@@ -77,7 +77,7 @@ The [.env](https://github.com/infiniflow/ragflow/blob/main/docker/.env) file con
 - `MINIO_USER`  
   The username for MinIO.
 - `MINIO_PASSWORD`  
-  The password for MinIO.
+  The password for MinIO. accordingly.
 
 ### Redis
 
@@ -93,8 +93,8 @@ The [.env](https://github.com/infiniflow/ragflow/blob/main/docker/.env) file con
 - `RAGFLOW-IMAGE`  
   The Docker image edition. Available editions:  
   
-  - `infiniflow/ragflow:v0.14.1-slim` (default): The RAGFlow Docker image without embedding models.  
-  - `infiniflow/ragflow:v0.14.1`: The RAGFlow Docker image with embedding models including:
+  - `infiniflow/ragflow:dev-slim` (default): The RAGFlow Docker image without embedding models.  
+  - `infiniflow/ragflow:dev`: The RAGFlow Docker image with embedding models including:
     - Built-in embedding models:
       - `BAAI/bge-large-zh-v1.5` 
       - `BAAI/bge-reranker-v2-m3`
@@ -113,12 +113,12 @@ The [.env](https://github.com/infiniflow/ragflow/blob/main/docker/.env) file con
 :::tip NOTE  
 If you cannot download the RAGFlow Docker image, try the following mirrors.  
 
-- For the `nightly-slim` edition:  
-  - `RAGFLOW_IMAGE=swr.cn-north-4.myhuaweicloud.com/infiniflow/ragflow:nightly-slim` or,
-  - `RAGFLOW_IMAGE=registry.cn-hangzhou.aliyuncs.com/infiniflow/ragflow:nightly-slim`.
-- For the `nightly` edition:  
-  - `RAGFLOW_IMAGE=swr.cn-north-4.myhuaweicloud.com/infiniflow/ragflow:nightly` or,
-  - `RAGFLOW_IMAGE=registry.cn-hangzhou.aliyuncs.com/infiniflow/ragflow:nightly`.
+- For the `dev-slim` edition:  
+  - `RAGFLOW_IMAGE=swr.cn-north-4.myhuaweicloud.com/infiniflow/ragflow:dev-slim` or,
+  - `RAGFLOW_IMAGE=registry.cn-hangzhou.aliyuncs.com/infiniflow/ragflow:dev-slim`.
+- For the `dev` edition:  
+  - `RAGFLOW_IMAGE=swr.cn-north-4.myhuaweicloud.com/infiniflow/ragflow:dev` or,
+  - `RAGFLOW_IMAGE=registry.cn-hangzhou.aliyuncs.com/infiniflow/ragflow:dev`.
 :::
 
 ### Timezone
@@ -149,15 +149,15 @@ If you cannot download the RAGFlow Docker image, try the following mirrors.
   
 - `name`: The MySQL database name. Defaults to `rag_flow`.
 - `user`: The username for MySQL.
-- `password`: The password for MySQL.
+- `password`: The password for MySQL. When updated, you must revise the `MYSQL_PASSWORD` variable in [.env](https://github.com/infiniflow/ragflow/blob/main/docker/.env) accordingly.
 - `port`: The MySQL serving port inside the Docker container. Defaults to `3306`.
 - `max_connections`: The maximum number of concurrent connections to the MySQL database. Defaults to `100`.
 - `stale_timeout`: Timeout in seconds.
 
 ### `minio`
   
-- `user`: The username for MinIO.
-- `password`: The password for MinIO.
+- `user`: The username for MinIO. When updated, you must revise the `MINIO_USER` variable in [.env](https://github.com/infiniflow/ragflow/blob/main/docker/.env) accordingly.
+- `password`: The password for MinIO. When updated, you must revise the `MINIO_PASSWORD` variable in [.env](https://github.com/infiniflow/ragflow/blob/main/docker/.env) accordingly.
 - `host`: The MinIO serving IP *and* port inside the Docker container. Defaults to `minio:9000`.
 
 ### `oauth`  

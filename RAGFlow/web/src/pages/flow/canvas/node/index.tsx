@@ -1,4 +1,3 @@
-import { useTheme } from '@/components/theme-provider';
 import classNames from 'classnames';
 import { Handle, NodeProps, Position } from 'reactflow';
 import { NodeData } from '../../interface';
@@ -12,16 +11,11 @@ export function RagNode({
   isConnectable = true,
   selected,
 }: NodeProps<NodeData>) {
-  const { theme } = useTheme();
   return (
     <section
-      className={classNames(
-        styles.ragNode,
-        theme === 'dark' ? styles.dark : '',
-        {
-          [styles.selectedNode]: selected,
-        },
-      )}
+      className={classNames(styles.ragNode, {
+        [styles.selectedNode]: selected,
+      })}
     >
       <Handle
         id="c"

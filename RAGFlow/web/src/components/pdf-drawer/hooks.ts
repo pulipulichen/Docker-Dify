@@ -1,16 +1,14 @@
 import { useSetModalState } from '@/hooks/common-hooks';
-import { IReferenceChunk } from '@/interfaces/database/chat';
+import { IChunk } from '@/interfaces/database/knowledge';
 import { useCallback, useState } from 'react';
 
 export const useClickDrawer = () => {
   const { visible, showModal, hideModal } = useSetModalState();
-  const [selectedChunk, setSelectedChunk] = useState<IReferenceChunk>(
-    {} as IReferenceChunk,
-  );
+  const [selectedChunk, setSelectedChunk] = useState<IChunk>({} as IChunk);
   const [documentId, setDocumentId] = useState<string>('');
 
   const clickDocumentButton = useCallback(
-    (documentId: string, chunk: IReferenceChunk) => {
+    (documentId: string, chunk: IChunk) => {
       showModal();
       setSelectedChunk(chunk);
       setDocumentId(documentId);

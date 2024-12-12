@@ -1,5 +1,4 @@
 import LLMLabel from '@/components/llm-select/llm-label';
-import { useTheme } from '@/components/theme-provider';
 import { Flex } from 'antd';
 import classNames from 'classnames';
 import { get } from 'lodash';
@@ -12,16 +11,12 @@ import NodeHeader from './node-header';
 
 export function CategorizeNode({ id, data, selected }: NodeProps<NodeData>) {
   const { positions } = useBuildCategorizeHandlePositions({ data, id });
-  const { theme } = useTheme();
+
   return (
     <section
-      className={classNames(
-        styles.logicNode,
-        theme === 'dark' ? styles.dark : '',
-        {
-          [styles.selectedNode]: selected,
-        },
-      )}
+      className={classNames(styles.logicNode, {
+        [styles.selectedNode]: selected,
+      })}
     >
       <Handle
         type="target"

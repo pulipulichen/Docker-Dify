@@ -5,11 +5,9 @@ import camelCase from 'lodash/camelCase';
 import React from 'react';
 import User from '../user';
 
-import { useTheme } from '@/components/theme-provider';
 import { LanguageList, LanguageMap } from '@/constants/common';
 import { useChangeLanguage } from '@/hooks/logic-hooks';
 import { useFetchUserInfo } from '@/hooks/user-setting-hooks';
-import { MoonIcon, SunIcon } from 'lucide-react';
 import styled from './index.less';
 
 const Circle = ({ children, ...restProps }: React.PropsWithChildren) => {
@@ -27,8 +25,6 @@ const handleGithubCLick = () => {
 const RightToolBar = () => {
   const { t } = useTranslate('common');
   const changeLanguage = useChangeLanguage();
-  const { setTheme, theme } = useTheme();
-
   const {
     data: { language = 'English' },
   } = useFetchUserInfo();
@@ -44,13 +40,6 @@ const RightToolBar = () => {
     return [...pre!, { type: 'divider' }, cur];
   }, []);
 
-  const onMoonClick = React.useCallback(() => {
-    setTheme('light');
-  }, [setTheme]);
-  const onSunClick = React.useCallback(() => {
-    setTheme('dark');
-  }, [setTheme]);
-
   return (
     <div className={styled.toolbarWrapper}>
       <Space wrap size={16}>
@@ -63,13 +52,9 @@ const RightToolBar = () => {
         <Circle>
           <GithubOutlined onClick={handleGithubCLick} />
         </Circle>
-        <Circle>
-          {theme === 'dark' ? (
-            <MoonIcon onClick={onMoonClick} size={20} />
-          ) : (
-            <SunIcon onClick={onSunClick} size={20} />
-          )}
-        </Circle>
+        {/* <Circle>
+          <MonIcon />
+        </Circle> */}
         <User></User>
       </Space>
     </div>

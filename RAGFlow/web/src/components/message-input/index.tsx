@@ -27,7 +27,6 @@ import {
 } from 'antd';
 import classNames from 'classnames';
 import get from 'lodash/get';
-import { Paperclip } from 'lucide-react';
 import {
   ChangeEventHandler,
   memo,
@@ -37,6 +36,7 @@ import {
   useState,
 } from 'react';
 import FileIcon from '../file-icon';
+import SvgIcon from '../svg-icon';
 import styles from './index.less';
 
 type FileType = Parameters<GetProp<UploadProps, 'beforeUpload'>>[0];
@@ -98,6 +98,7 @@ const MessageInput = ({
   const { data: documentInfos, setDocumentIds } = useFetchDocumentInfosByIds();
   const { uploadAndParseDocument } = useUploadAndParseDocument(uploadMethod);
   const conversationIdRef = useRef(conversationId);
+
   const [fileList, setFileList] = useState<UploadFile[]>([]);
 
   const handlePreview = async (file: UploadFile) => {
@@ -224,7 +225,14 @@ const MessageInput = ({
                 <Button
                   type={'text'}
                   disabled={disabled}
-                  icon={<Paperclip></Paperclip>}
+                  icon={
+                    <SvgIcon
+                      name="paper-clip"
+                      width={18}
+                      height={22}
+                      disabled={disabled}
+                    ></SvgIcon>
+                  }
                 ></Button>
               </Upload>
             )}

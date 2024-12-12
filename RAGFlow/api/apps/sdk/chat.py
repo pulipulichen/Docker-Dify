@@ -26,7 +26,7 @@ from api.utils.api_utils import get_result
 
 
 
-@manager.route('/chats', methods=['POST'])  # noqa: F821
+@manager.route('/chats', methods=['POST'])
 @token_required
 def create(tenant_id):
     req=request.json
@@ -104,12 +104,9 @@ def create(tenant_id):
         "parameters": [
             {"key": "knowledge", "optional": False}
         ],
-        "empty_response": "Sorry! No relevant content was found in the knowledge base!",
-        "quote":True,
-        "tts":False,
-        "refine_multiturn":True
+        "empty_response": "Sorry! No relevant content was found in the knowledge base!"
     }
-    key_list_2 = ["system", "prologue", "parameters", "empty_response","quote","tts","refine_multiturn"]
+    key_list_2 = ["system", "prologue", "parameters", "empty_response"]
     if "prompt_config" not in req:
         req['prompt_config'] = {}
     for key in key_list_2:
@@ -150,7 +147,7 @@ def create(tenant_id):
     res["avatar"] = res.pop("icon")
     return get_result(data=res)
 
-@manager.route('/chats/<chat_id>', methods=['PUT'])  # noqa: F821
+@manager.route('/chats/<chat_id>', methods=['PUT'])
 @token_required
 def update(tenant_id,chat_id):
     if not DialogService.query(tenant_id=tenant_id, id=chat_id, status=StatusEnum.VALID.value):
@@ -164,7 +161,7 @@ def update(tenant_id,chat_id):
             return get_error_data_result("`datasets` can't be empty")
         if ids:
             for kb_id in ids:
-                kbs = KnowledgebaseService.accessible(kb_id=kb_id, user_id=tenant_id)
+                kbs = KnowledgebaseService.accessible(kb_id=chat_id, user_id=tenant_id)
                 if not kbs:
                     return get_error_data_result(f"You don't own the dataset {kb_id}")
                 kbs = KnowledgebaseService.query(id=kb_id)
@@ -238,7 +235,7 @@ def update(tenant_id,chat_id):
     return get_result()
 
 
-@manager.route('/chats', methods=['DELETE'])  # noqa: F821
+@manager.route('/chats', methods=['DELETE'])
 @token_required
 def delete(tenant_id):
     req = request.json
@@ -260,7 +257,7 @@ def delete(tenant_id):
         DialogService.update_by_id(id, temp_dict)
     return get_result()
 
-@manager.route('/chats', methods=['GET'])  # noqa: F821
+@manager.route('/chats', methods=['GET'])
 @token_required
 def list_chat(tenant_id):
     id = request.args.get("id")

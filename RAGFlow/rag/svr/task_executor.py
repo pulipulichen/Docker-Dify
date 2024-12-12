@@ -17,19 +17,28 @@
 # from beartype.claw import beartype_all  # <-- you didn't sign up for this
 # beartype_all(conf=BeartypeConf(violation_type=UserWarning))    # <-- emit warnings from all code
 
+import logging
 import sys
 from api.utils.log_utils import initRootLogger
+
 CONSUMER_NO = "0" if len(sys.argv) < 2 else sys.argv[1]
 CONSUMER_NAME = "task_executor_" + CONSUMER_NO
 initRootLogger(CONSUMER_NAME)
+for module in ["pdfminer"]:
+    module_logger = logging.getLogger(module)
+    module_logger.setLevel(logging.WARNING)
+for module in ["peewee"]:
+    module_logger = logging.getLogger(module)
+    module_logger.handlers.clear()
+    module_logger.propagate = True
 
-import logging
-import os
 from datetime import datetime
 import json
-import xxhash
+import os
+import hashlib
 import copy
 import re
+import sys
 import time
 import threading
 from functools import partial
@@ -39,23 +48,21 @@ from timeit import default_timer as timer
 import tracemalloc
 
 import numpy as np
-from peewee import DoesNotExist
 
-from api.db import LLMType, ParserType, TaskStatus
+from api.db import LLMType, ParserType
 from api.db.services.dialog_service import keyword_extraction, question_proposal
 from api.db.services.document_service import DocumentService
 from api.db.services.llm_service import LLMBundle
 from api.db.services.task_service import TaskService
 from api.db.services.file2document_service import File2DocumentService
 from api import settings
-from api.versions import get_ragflow_version
 from api.db.db_models import close_connection
 from rag.app import laws, paper, presentation, manual, qa, table, book, resume, picture, naive, one, audio, \
     knowledge_graph, email
 from rag.nlp import search, rag_tokenizer
 from rag.raptor import RecursiveAbstractiveProcessing4TreeOrganizedRetrieval as Raptor
-from rag.settings import DOC_MAXIMUM_SIZE, SVR_QUEUE_NAME, print_rag_settings
-from rag.utils import num_tokens_from_string
+from rag.settings import DOC_MAXIMUM_SIZE, SVR_QUEUE_NAME
+from rag.utils import rmSpace, num_tokens_from_string
 from rag.utils.redis_conn import REDIS_CONN, Payload
 from rag.utils.storage_factory import STORAGE_IMPL
 
@@ -90,23 +97,12 @@ DONE_TASKS = 0
 FAILED_TASKS = 0
 CURRENT_TASK = None
 
-class TaskCanceledException(Exception):
-    def __init__(self, msg):
-        self.msg = msg
 
 def set_progress(task_id, from_page=0, to_page=-1, prog=None, msg="Processing..."):
     global PAYLOAD
     if prog is not None and prog < 0:
         msg = "[ERROR]" + msg
-    try:
-        cancel = TaskService.do_cancel(task_id)
-    except DoesNotExist:
-        logging.warning(f"set_progress task {task_id} is unknown")
-        if PAYLOAD:
-            PAYLOAD.ack()
-            PAYLOAD = None
-        return
-
+    cancel = TaskService.do_cancel(task_id)
     if cancel:
         msg += " [Canceled]"
         prog = -1
@@ -117,22 +113,18 @@ def set_progress(task_id, from_page=0, to_page=-1, prog=None, msg="Processing...
     d = {"progress_msg": msg}
     if prog is not None:
         d["progress"] = prog
-
-    logging.info(f"set_progress({task_id}), progress: {prog}, progress_msg: {msg}")
     try:
+        logging.info(f"set_progress({task_id}), progress: {prog}, progress_msg: {msg}")
         TaskService.update_progress(task_id, d)
-    except DoesNotExist:
-        logging.warning(f"set_progress task {task_id} is unknown")
+    except Exception:
+        logging.exception(f"set_progress({task_id}) got exception")
+
+    close_connection()
+    if cancel:
         if PAYLOAD:
             PAYLOAD.ack()
             PAYLOAD = None
-        return
-
-    close_connection()
-    if cancel and PAYLOAD:
-        PAYLOAD.ack()
-        PAYLOAD = None
-        raise TaskCanceledException(msg)
+        os._exit(0)
 
 
 def collect():
@@ -152,22 +144,16 @@ def collect():
     if not msg:
         return None
 
-    task = None
-    canceled = False
-    try:
-        task = TaskService.get_task(msg["id"])
-        if task:
-            _, doc = DocumentService.get_by_id(task["doc_id"])
-            canceled = doc.run == TaskStatus.CANCEL.value or doc.progress < 0
-    except DoesNotExist:
-        pass
-    except Exception:
-        logging.exception("collect get_task exception")
-    if not task or canceled:
-        state = "is unknown" if not task else "has been cancelled"
+    if TaskService.do_cancel(msg["id"]):
         with mt_lock:
             DONE_TASKS += 1
-        logging.info(f"collect task {msg['id']} {state}")
+        logging.info("Task {} has been canceled.".format(msg["id"]))
+        return None
+    task = TaskService.get_task(msg["id"])
+    if not task:
+        with mt_lock:
+            DONE_TASKS += 1
+        logging.warning("{} empty task!".format(msg["id"]))
         return None
 
     if msg.get("type", "") == "raptor":
@@ -179,62 +165,69 @@ def get_storage_binary(bucket, name):
     return STORAGE_IMPL.get(bucket, name)
 
 
-def build_chunks(task, progress_callback):
-    if task["size"] > DOC_MAXIMUM_SIZE:
-        set_progress(task["id"], prog=-1, msg="File size exceeds( <= %dMb )" %
-                                              (int(DOC_MAXIMUM_SIZE / 1024 / 1024)))
+def build(row):
+    if row["size"] > DOC_MAXIMUM_SIZE:
+        set_progress(row["id"], prog=-1, msg="File size exceeds( <= %dMb )" %
+                                             (int(DOC_MAXIMUM_SIZE / 1024 / 1024)))
         return []
 
-    chunker = FACTORY[task["parser_id"].lower()]
+    callback = partial(
+        set_progress,
+        row["id"],
+        row["from_page"],
+        row["to_page"])
+    chunker = FACTORY[row["parser_id"].lower()]
     try:
         st = timer()
-        bucket, name = File2DocumentService.get_storage_address(doc_id=task["doc_id"])
+        bucket, name = File2DocumentService.get_storage_address(doc_id=row["doc_id"])
         binary = get_storage_binary(bucket, name)
-        logging.info("From minio({}) {}/{}".format(timer() - st, task["location"], task["name"]))
+        logging.info(
+            "From minio({}) {}/{}".format(timer() - st, row["location"], row["name"]))
     except TimeoutError:
-        progress_callback(-1, "Internal server error: Fetch file from minio timeout. Could you try it again.")
-        logging.exception("Minio {}/{} got timeout: Fetch file from minio timeout.".format(task["location"], task["name"]))
+        callback(-1, "Internal server error: Fetch file from minio timeout. Could you try it again.")
+        logging.exception(
+            "Minio {}/{} got timeout: Fetch file from minio timeout.".format(row["location"], row["name"]))
         raise
     except Exception as e:
         if re.search("(No such file|not found)", str(e)):
-            progress_callback(-1, "Can not find file <%s> from minio. Could you try it again?" % task["name"])
+            callback(-1, "Can not find file <%s> from minio. Could you try it again?" % row["name"])
         else:
-            progress_callback(-1, "Get file from minio: %s" % str(e).replace("'", ""))
-        logging.exception("Chunking {}/{} got exception".format(task["location"], task["name"]))
+            callback(-1, "Get file from minio: %s" % str(e).replace("'", ""))
+        logging.exception("Chunking {}/{} got exception".format(row["location"], row["name"]))
         raise
 
     try:
-        cks = chunker.chunk(task["name"], binary=binary, from_page=task["from_page"],
-                            to_page=task["to_page"], lang=task["language"], callback=progress_callback,
-                            kb_id=task["kb_id"], parser_config=task["parser_config"], tenant_id=task["tenant_id"])
-        logging.info("Chunking({}) {}/{} done".format(timer() - st, task["location"], task["name"]))
-    except TaskCanceledException:
-        raise
+        cks = chunker.chunk(row["name"], binary=binary, from_page=row["from_page"],
+                            to_page=row["to_page"], lang=row["language"], callback=callback,
+                            kb_id=row["kb_id"], parser_config=row["parser_config"], tenant_id=row["tenant_id"])
+        logging.info("Chunking({}) {}/{} done".format(timer() - st, row["location"], row["name"]))
     except Exception as e:
-        progress_callback(-1, "Internal server error while chunking: %s" % str(e).replace("'", ""))
-        logging.exception("Chunking {}/{} got exception".format(task["location"], task["name"]))
+        callback(-1, "Internal server error while chunking: %s" %
+                 str(e).replace("'", ""))
+        logging.exception("Chunking {}/{} got exception".format(row["location"], row["name"]))
         raise
 
     docs = []
     doc = {
-        "doc_id": task["doc_id"],
-        "kb_id": str(task["kb_id"])
+        "doc_id": row["doc_id"],
+        "kb_id": str(row["kb_id"])
     }
-    if task["pagerank"]:
-        doc["pagerank_fea"] = int(task["pagerank"])
     el = 0
     for ck in cks:
         d = copy.deepcopy(doc)
         d.update(ck)
-        d["id"] = xxhash.xxh64((ck["content_with_weight"] + str(d["doc_id"])).encode("utf-8")).hexdigest()
+        md5 = hashlib.md5()
+        md5.update((ck["content_with_weight"] +
+                    str(d["doc_id"])).encode("utf-8"))
+        d["id"] = md5.hexdigest()
         d["create_time"] = str(datetime.now()).replace("T", " ")[:19]
         d["create_timestamp_flt"] = datetime.now().timestamp()
         if not d.get("image"):
             _ = d.pop("image", None)
             d["img_id"] = ""
-            d["page_num_int"] = []
-            d["position_int"] = []
-            d["top_int"] = []
+            d["page_num_list"] = json.dumps([])
+            d["position_list"] = json.dumps([])
+            d["top_list"] = json.dumps([])
             docs.append(d)
             continue
 
@@ -246,57 +239,56 @@ def build_chunks(task, progress_callback):
                 d["image"].save(output_buffer, format='JPEG')
 
             st = timer()
-            STORAGE_IMPL.put(task["kb_id"], d["id"], output_buffer.getvalue())
+            STORAGE_IMPL.put(row["kb_id"], d["id"], output_buffer.getvalue())
             el += timer() - st
         except Exception:
-            logging.exception("Saving image of chunk {}/{}/{} got exception".format(task["location"], task["name"], d["_id"]))
+            logging.exception(
+                "Saving image of chunk {}/{}/{} got exception".format(row["location"], row["name"], d["_id"]))
             raise
 
-        d["img_id"] = "{}-{}".format(task["kb_id"], d["id"])
+        d["img_id"] = "{}-{}".format(row["kb_id"], d["id"])
         del d["image"]
         docs.append(d)
-    logging.info("MINIO PUT({}):{}".format(task["name"], el))
+    logging.info("MINIO PUT({}):{}".format(row["name"], el))
 
-    if task["parser_config"].get("auto_keywords", 0):
+    if row["parser_config"].get("auto_keywords", 0):
         st = timer()
-        progress_callback(msg="Start to generate keywords for every chunk ...")
-        chat_mdl = LLMBundle(task["tenant_id"], LLMType.CHAT, llm_name=task["llm_id"], lang=task["language"])
+        callback(msg="Start to generate keywords for every chunk ...")
+        chat_mdl = LLMBundle(row["tenant_id"], LLMType.CHAT, llm_name=row["llm_id"], lang=row["language"])
         for d in docs:
             d["important_kwd"] = keyword_extraction(chat_mdl, d["content_with_weight"],
-                                                    task["parser_config"]["auto_keywords"]).split(",")
+                                                    row["parser_config"]["auto_keywords"]).split(",")
             d["important_tks"] = rag_tokenizer.tokenize(" ".join(d["important_kwd"]))
-        progress_callback(msg="Keywords generation completed in {:.2f}s".format(timer() - st))
+        callback(msg="Keywords generation completed in {:.2f}s".format(timer() - st))
 
-    if task["parser_config"].get("auto_questions", 0):
+    if row["parser_config"].get("auto_questions", 0):
         st = timer()
-        progress_callback(msg="Start to generate questions for every chunk ...")
-        chat_mdl = LLMBundle(task["tenant_id"], LLMType.CHAT, llm_name=task["llm_id"], lang=task["language"])
+        callback(msg="Start to generate questions for every chunk ...")
+        chat_mdl = LLMBundle(row["tenant_id"], LLMType.CHAT, llm_name=row["llm_id"], lang=row["language"])
         for d in docs:
-            d["question_kwd"] = question_proposal(chat_mdl, d["content_with_weight"], task["parser_config"]["auto_questions"]).split("\n")
-            d["question_tks"] = rag_tokenizer.tokenize("\n".join(d["question_kwd"]))
-        progress_callback(msg="Question generation completed in {:.2f}s".format(timer() - st))
+            qst = question_proposal(chat_mdl, d["content_with_weight"], row["parser_config"]["auto_questions"])
+            d["content_with_weight"] = f"Question: \n{qst}\n\nAnswer:\n" + d["content_with_weight"]
+            qst = rag_tokenizer.tokenize(qst)
+            if "content_ltks" in d:
+                d["content_ltks"] += " " + qst
+            if "content_sm_ltks" in d:
+                d["content_sm_ltks"] += " " + rag_tokenizer.fine_grained_tokenize(qst)
+        callback(msg="Question generation completed in {:.2f}s".format(timer() - st))
 
     return docs
 
 
 def init_kb(row, vector_size: int):
     idxnm = search.index_name(row["tenant_id"])
-    return settings.docStoreConn.createIdx(idxnm, row.get("kb_id",""), vector_size)
+    return settings.docStoreConn.createIdx(idxnm, row["kb_id"], vector_size)
 
 
 def embedding(docs, mdl, parser_config=None, callback=None):
     if parser_config is None:
         parser_config = {}
-    batch_size = 16
-    tts, cnts = [], []
-    for d in docs:
-        tts.append(d.get("docnm_kwd", "Title"))
-        c = "\n".join(d.get("question_kwd", []))
-        if not c:
-            c = d["content_with_weight"]
-        c = re.sub(r"</?(table|td|caption|tr|th)( [^<>]{0,12})?>", " ", c)
-        cnts.append(c)
-
+    batch_size = 32
+    tts, cnts = [rmSpace(d["title_tks"]) for d in docs if d.get("title_tks")], [
+        re.sub(r"</?(table|td|caption|tr|th)( [^<>]{0,12})?>", " ", d["content_with_weight"]) for d in docs]
     tk_count = 0
     if len(tts) == len(cnts):
         tts_ = np.array([])
@@ -352,20 +344,20 @@ def run_raptor(row, chat_mdl, embd_mdl, callback=None):
         row["parser_config"]["raptor"]["threshold"]
     )
     original_length = len(chunks)
-    chunks = raptor(chunks, row["parser_config"]["raptor"]["random_seed"], callback)
+    raptor(chunks, row["parser_config"]["raptor"]["random_seed"], callback)
     doc = {
         "doc_id": row["doc_id"],
         "kb_id": [str(row["kb_id"])],
         "docnm_kwd": row["name"],
         "title_tks": rag_tokenizer.tokenize(row["name"])
     }
-    if row["pagerank"]:
-        doc["pagerank_fea"] = int(row["pagerank"])
     res = []
     tk_count = 0
     for content, vctr in chunks[original_length:]:
         d = copy.deepcopy(doc)
-        d["id"] = xxhash.xxh64((content + str(d["doc_id"])).encode("utf-8")).hexdigest()
+        md5 = hashlib.md5()
+        md5.update((content + str(d["doc_id"])).encode("utf-8"))
+        d["id"] = md5.hexdigest()
         d["create_time"] = str(datetime.now()).replace("T", " ")[:19]
         d["create_timestamp_flt"] = datetime.now().timestamp()
         d[vctr_nm] = vctr.tolist()
@@ -377,112 +369,73 @@ def run_raptor(row, chat_mdl, embd_mdl, callback=None):
     return res, tk_count, vector_size
 
 
-
-
-def do_handle_task(task):
-    task_id = task["id"]
-    task_from_page = task["from_page"]
-    task_to_page = task["to_page"]
-    task_tenant_id = task["tenant_id"]
-    task_embedding_id = task["embd_id"]
-    task_language = task["language"]
-    task_llm_id = task["llm_id"]
-    task_dataset_id = task["kb_id"]
-    task_doc_id = task["doc_id"]
-    task_document_name = task["name"]
-    task_parser_config = task["parser_config"]
-
-    # prepare the progress callback function
-    progress_callback = partial(set_progress, task_id, task_from_page, task_to_page)
-
+def do_handle_task(r):
+    callback = partial(set_progress, r["id"], r["from_page"], r["to_page"])
     try:
-        task_canceled = TaskService.do_cancel(task_id)
-    except DoesNotExist:
-        logging.warning(f"task {task_id} is unknown")
-        return
-    if task_canceled:
-        progress_callback(-1, msg="Task has been canceled.")
-        return
-
-    try:
-        # bind embedding model
-        embedding_model = LLMBundle(task_tenant_id, LLMType.EMBEDDING, llm_name=task_embedding_id, lang=task_language)
+        embd_mdl = LLMBundle(r["tenant_id"], LLMType.EMBEDDING, llm_name=r["embd_id"], lang=r["language"])
     except Exception as e:
-        error_message = f'Fail to bind embedding model: {str(e)}'
-        progress_callback(-1, msg=error_message)
-        logging.exception(error_message)
+        callback(-1, msg=str(e))
         raise
-
-    # Either using RAPTOR or Standard chunking methods
-    if task.get("task_type", "") == "raptor":
+    if r.get("task_type", "") == "raptor":
         try:
-            # bind LLM for raptor
-            chat_model = LLMBundle(task_tenant_id, LLMType.CHAT, llm_name=task_llm_id, lang=task_language)
-
-            # run RAPTOR
-            chunks, token_count, vector_size = run_raptor(task, chat_model, embedding_model, progress_callback)
-        except TaskCanceledException:
-            raise
+            chat_mdl = LLMBundle(r["tenant_id"], LLMType.CHAT, llm_name=r["llm_id"], lang=r["language"])
+            cks, tk_count, vector_size = run_raptor(r, chat_mdl, embd_mdl, callback)
         except Exception as e:
-            error_message = f'Fail to bind LLM used by RAPTOR: {str(e)}'
-            progress_callback(-1, msg=error_message)
-            logging.exception(error_message)
+            callback(-1, msg=str(e))
             raise
     else:
-        # Standard chunking methods
-        start_ts = timer()
-        chunks = build_chunks(task, progress_callback)
-        logging.info("Build document {}: {:.2f}s".format(task_document_name, timer() - start_ts))
-        if chunks is None:
+        st = timer()
+        cks = build(r)
+        logging.info("Build chunks({}): {}".format(r["name"], timer() - st))
+        if cks is None:
             return
-        if not chunks:
-            progress_callback(1., msg=f"No chunk built from {task_document_name}")
+        if not cks:
+            callback(1., "No chunk! Done!")
             return
         # TODO: exception handler
-        ## set_progress(task["did"], -1, "ERROR: ")
-        progress_callback(msg="Generate {} chunks".format(len(chunks)))
-        start_ts = timer()
+        ## set_progress(r["did"], -1, "ERROR: ")
+        callback(
+                msg="Finished slicing files ({} chunks in {:.2f}s). Start to embedding the content.".format(len(cks),
+                                                                                                            timer() - st)
+        )
+        st = timer()
         try:
-            token_count, vector_size = embedding(chunks, embedding_model, task_parser_config, progress_callback)
+            tk_count, vector_size = embedding(cks, embd_mdl, r["parser_config"], callback)
         except Exception as e:
-            error_message = "Generate embedding error:{}".format(str(e))
-            progress_callback(-1, error_message)
-            logging.exception(error_message)
-            token_count = 0
+            callback(-1, "Embedding error:{}".format(str(e)))
+            logging.exception("run_rembedding got exception")
+            tk_count = 0
             raise
-        progress_message = "Embedding chunks ({:.2f}s)".format(timer() - start_ts)
-        logging.info(progress_message)
-        progress_callback(msg=progress_message)
-
-    # logging.info(f"task_executor init_kb index {search.index_name(task_tenant_id)} embedding_model {embedding_model.llm_name} vector length {vector_size}")
-    init_kb(task, vector_size)
-    chunk_count = len(set([chunk["id"] for chunk in chunks]))
-    start_ts = timer()
-    doc_store_result = ""
+        logging.info("Embedding elapsed({}): {:.2f}".format(r["name"], timer() - st))
+        callback(msg="Finished embedding (in {:.2f}s)! Start to build index!".format(timer() - st))
+    # logging.info(f"task_executor init_kb index {search.index_name(r["tenant_id"])} embd_mdl {embd_mdl.llm_name} vector length {vector_size}")
+    init_kb(r, vector_size)
+    chunk_count = len(set([c["id"] for c in cks]))
+    st = timer()
+    es_r = ""
     es_bulk_size = 4
-    for b in range(0, len(chunks), es_bulk_size):
-        doc_store_result = settings.docStoreConn.insert(chunks[b:b + es_bulk_size], search.index_name(task_tenant_id), task_dataset_id)
+    for b in range(0, len(cks), es_bulk_size):
+        es_r = settings.docStoreConn.insert(cks[b:b + es_bulk_size], search.index_name(r["tenant_id"]), r["kb_id"])
         if b % 128 == 0:
-            progress_callback(prog=0.8 + 0.1 * (b + 1) / len(chunks), msg="")
-        if doc_store_result:
-            error_message = f"Insert chunk error: {doc_store_result}, please check log file and Elasticsearch/Infinity status!"
-            progress_callback(-1, msg=error_message)
-            raise Exception(error_message)
-        chunk_ids = [chunk["id"] for chunk in chunks[:b + es_bulk_size]]
-        chunk_ids_str = " ".join(chunk_ids)
-        try:
-            TaskService.update_chunk_ids(task["id"], chunk_ids_str)
-        except DoesNotExist:
-            logging.warning(f"do_handle_task update_chunk_ids failed since task {task['id']} is unknown.")
-            doc_store_result = settings.docStoreConn.delete({"id": chunk_ids}, search.index_name(task_tenant_id), task_dataset_id)
-            return
-    logging.info("Indexing doc({}), page({}-{}), chunks({}), elapsed: {:.2f}".format(task_document_name, task_from_page, task_to_page, len(chunks), timer() - start_ts))
+            callback(prog=0.8 + 0.1 * (b + 1) / len(cks), msg="")
+    logging.info("Indexing elapsed({}): {:.2f}".format(r["name"], timer() - st))
+    if es_r:
+        callback(-1, "Insert chunk error, detail info please check log file. Please also check Elasticsearch/Infinity status!")
+        settings.docStoreConn.delete({"doc_id": r["doc_id"]}, search.index_name(r["tenant_id"]), r["kb_id"])
+        logging.error('Insert chunk error: ' + str(es_r))
+        raise Exception('Insert chunk error: ' + str(es_r))
 
-    DocumentService.increment_chunk_num(task_doc_id, task_dataset_id, token_count, chunk_count, 0)
+    if TaskService.do_cancel(r["id"]):
+        settings.docStoreConn.delete({"doc_id": r["doc_id"]}, search.index_name(r["tenant_id"]), r["kb_id"])
+        return
 
-    time_cost = timer() - start_ts
-    progress_callback(prog=1.0, msg="Done ({:.2f}s)".format(time_cost))
-    logging.info("Chunk doc({}), page({}-{}), chunks({}), token({}), elapsed:{:.2f}".format(task_document_name, task_from_page, task_to_page, len(chunks), token_count, time_cost))
+    callback(msg="Indexing elapsed in {:.2f}s.".format(timer() - st))
+    callback(1., "Done!")
+    DocumentService.increment_chunk_num(
+        r["doc_id"], r["kb_id"], tk_count, chunk_count, 0)
+    logging.info(
+        "Chunk doc({}), token({}), chunks({}), elapsed:{:.2f}".format(
+                r["id"], tk_count, len(cks), timer() - st))
 
 
 def handle_task():
@@ -498,12 +451,6 @@ def handle_task():
                 DONE_TASKS += 1
                 CURRENT_TASK = None
             logging.info(f"handle_task done for task {json.dumps(task)}")
-        except TaskCanceledException:
-            with mt_lock:
-                DONE_TASKS += 1
-                CURRENT_TASK = None
-            logging.info(f"handle_task got TaskCanceledException for task {json.dumps(task)}")
-            logging.debug("handle_task got TaskCanceledException", exc_info=True)
         except Exception:
             with mt_lock:
                 FAILED_TASKS += 1
@@ -555,7 +502,7 @@ def analyze_heap(snapshot1: tracemalloc.Snapshot, snapshot2: tracemalloc.Snapsho
         for stat in stats2[:10]:
             msg += f"{stat}\n"
     stats1_vs_2 = snapshot2.compare_to(snapshot1, 'lineno')
-    msg += f"{CONSUMER_NAME} memory usage increase from snapshot {snapshot_id - 1} to snapshot {snapshot_id}:\n"
+    msg += f"{CONSUMER_NAME} memory usage increase from snapshot {snapshot_id-1} to snapshot {snapshot_id}:\n"
     for stat in stats1_vs_2[:10]:
         msg += f"{stat}\n"
     msg += f"{CONSUMER_NAME} detailed traceback for the top memory consumers:\n"
@@ -565,16 +512,7 @@ def analyze_heap(snapshot1: tracemalloc.Snapshot, snapshot2: tracemalloc.Snapsho
 
 
 def main():
-    logging.info(r"""
-  ______           __      ______                     __            
- /_  __/___ ______/ /__   / ____/  _____  _______  __/ /_____  _____
-  / / / __ `/ ___/ //_/  / __/ | |/_/ _ \/ ___/ / / / __/ __ \/ ___/
- / / / /_/ (__  ) ,<    / /____>  </  __/ /__/ /_/ / /_/ /_/ / /    
-/_/  \__,_/____/_/|_|  /_____/_/|_|\___/\___/\__,_/\__/\____/_/                               
-    """)
-    logging.info(f'TaskExecutor: RAGFlow version: {get_ragflow_version()}')
     settings.init_settings()
-    print_rag_settings()
     background_thread = threading.Thread(target=report_status)
     background_thread.daemon = True
     background_thread.start()
@@ -589,12 +527,11 @@ def main():
     while True:
         handle_task()
         num_tasks = DONE_TASKS + FAILED_TASKS
-        if TRACE_MALLOC_DELTA > 0 and num_tasks > 0 and num_tasks % TRACE_MALLOC_DELTA == 0:
+        if TRACE_MALLOC_DELTA> 0 and num_tasks > 0 and num_tasks % TRACE_MALLOC_DELTA == 0:
             snapshot2 = tracemalloc.take_snapshot()
-            analyze_heap(snapshot1, snapshot2, int(num_tasks / TRACE_MALLOC_DELTA), num_tasks % TRACE_MALLOC_FULL == 0)
+            analyze_heap(snapshot1, snapshot2, int(num_tasks/TRACE_MALLOC_DELTA), num_tasks % TRACE_MALLOC_FULL == 0)
             snapshot1 = snapshot2
             snapshot2 = None
-
 
 if __name__ == "__main__":
     main()

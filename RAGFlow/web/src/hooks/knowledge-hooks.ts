@@ -41,7 +41,7 @@ export const useFetchKnowledgeBaseConfiguration = () => {
   return { data, loading };
 };
 
-export const useFetchKnowledgeList = (
+export const useNextFetchKnowledgeList = (
   shouldFilterListWithoutDocument: boolean = false,
 ): {
   list: IKnowledge[];

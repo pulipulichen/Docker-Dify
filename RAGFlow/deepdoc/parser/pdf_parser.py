@@ -21,6 +21,7 @@ import re
 import pdfplumber
 from PIL import Image
 import numpy as np
+from timeit import default_timer as timer
 from pypdf import PdfReader as pdf2_read
 
 from api import settings
@@ -151,7 +152,7 @@ class RAGFlowPdfParser:
             max(len(up["text"]), len(down["text"])),
             len(tks_all) - len(tks_up) - len(tks_down),
             len(tks_down) - len(tks_up),
-            tks_down[-1] == tks_up[-1] if tks_down and tks_up else False,
+            tks_down[-1] == tks_up[-1],
             max(down["in_row"], up["in_row"]),
             abs(down["in_row"] - up["in_row"]),
             len(tks_down) == 1 and rag_tokenizer.tag(tks_down[0]).find("n") >= 0,
@@ -751,7 +752,7 @@ class RAGFlowPdfParser:
                     "x1": np.max([b["x1"] for b in bxs]),
                     "bottom": np.max([b["bottom"] for b in bxs]) - ht
                 }
-                louts = [layout for layout in self.page_layout[pn] if layout["type"] == ltype]
+                louts = [l for l in self.page_layout[pn] if l["type"] == ltype]
                 ii = Recognizer.find_overlapped(b, louts, naive=True)
                 if ii is not None:
                     b = louts[ii]
@@ -762,8 +763,7 @@ class RAGFlowPdfParser:
                             "layoutno", "")))
 
                 left, top, right, bott = b["x0"], b["top"], b["x1"], b["bottom"]
-                if right < left:
-                    right = left + 1
+                if right < left: right = left + 1
                 poss.append((pn + self.page_from, left, right, top, bott))
                 return self.page_images[pn] \
                     .crop((left * ZM, top * ZM,
@@ -845,8 +845,7 @@ class RAGFlowPdfParser:
         top = bx["top"] - self.page_cum_height[pn[0] - 1]
         bott = bx["bottom"] - self.page_cum_height[pn[0] - 1]
         page_images_cnt = len(self.page_images)
-        if pn[-1] - 1 >= page_images_cnt:
-            return ""
+        if pn[-1] - 1 >= page_images_cnt: return ""
         while bott * ZM > self.page_images[pn[-1] - 1].size[1]:
             bott -= self.page_images[pn[-1] - 1].size[1] / ZM
             pn.append(pn[-1] + 1)
@@ -890,6 +889,7 @@ class RAGFlowPdfParser:
                 nonlocal mh, pw, lines, widths
                 lines.append(line)
                 widths.append(width(line))
+                width_mean = np.mean(widths)
                 mmj = self.proj_match(
                     line["text"]) or line.get(
                     "layout_type",
@@ -948,6 +948,7 @@ class RAGFlowPdfParser:
         self.page_cum_height = [0]
         self.page_layout = []
         self.page_from = page_from
+        st = timer()
         try:
             self.pdf = pdfplumber.open(fnm) if isinstance(
                 fnm, str) else pdfplumber.open(BytesIO(fnm))
@@ -955,12 +956,8 @@ class RAGFlowPdfParser:
                                 enumerate(self.pdf.pages[page_from:page_to])]
             self.page_images_x2 = [p.to_image(resolution=72 * zoomin * 2).annotated for i, p in
                                 enumerate(self.pdf.pages[page_from:page_to])]
-            try:
-                self.page_chars = [[{**c, 'top': c['top'], 'bottom': c['bottom']} for c in page.dedupe_chars().chars if self._has_color(c)] for page in self.pdf.pages[page_from:page_to]]
-            except Exception as e:
-                logging.warning(f"Failed to extract characters for pages {page_from}-{page_to}: {str(e)}")
-                self.page_chars = [[] for _ in range(page_to - page_from)]  # If failed to extract, using empty list instead.
-                
+            self.page_chars = [[{**c, 'top': c['top'], 'bottom': c['bottom']} for c in page.dedupe_chars().chars if self._has_color(c)] for page in
+                               self.pdf.pages[page_from:page_to]]
             self.total_page = len(self.pdf.pages)
         except Exception:
             logging.exception("RAGFlowPdfParser __images__")
@@ -993,7 +990,7 @@ class RAGFlowPdfParser:
         else:
             self.is_english = False
 
-        # st = timer()
+        st = timer()
         for i, img in enumerate(self.page_images_x2):
             chars = self.page_chars[i] if not self.is_english else []
             self.mean_height.append(
@@ -1027,8 +1024,8 @@ class RAGFlowPdfParser:
 
         self.page_cum_height = np.cumsum(self.page_cum_height)
         assert len(self.page_cum_height) == len(self.page_images) + 1
-        if len(self.boxes) == 0 and zoomin < 9:
-            self.__images__(fnm, zoomin * 3, page_from, page_to, callback)
+        if len(self.boxes) == 0 and zoomin < 9: self.__images__(fnm, zoomin * 3, page_from,
+                                                                page_to, callback)
 
     def __call__(self, fnm, need_image=True, zoomin=3, return_html=False):
         self.__images__(fnm, zoomin)
@@ -1167,7 +1164,7 @@ class PlainParser(object):
         if not self.outlines:
             logging.warning("Miss outlines")
 
-        return [(line, "") for line in lines], []
+        return [(l, "") for l in lines], []
 
     def crop(self, ck, need_position):
         raise NotImplementedError

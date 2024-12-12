@@ -43,7 +43,6 @@ if __name__ == '__main__':
         else:
             print(ans["content"])
 
-        if DEBUG:
-            print(canvas.path)
+        if DEBUG: print(canvas.path)
         question = input("\n==================== User =====================\n> ")
         canvas.add_user_input(question)

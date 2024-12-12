@@ -1,16 +1,8 @@
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { useSetModalState } from '@/hooks/common-hooks';
-import { FolderInput, FolderOutput } from 'lucide-react';
 import { useCallback, useEffect } from 'react';
 import ReactFlow, {
   Background,
   ConnectionMode,
-  ControlButton,
   Controls,
   NodeMouseHandler,
 } from 'reactflow';
@@ -21,21 +13,18 @@ import FormDrawer from '../flow-drawer';
 import {
   useGetBeginNodeDataQuery,
   useHandleDrop,
-  useHandleExportOrImportJsonFile,
   useSelectCanvasData,
   useShowFormDrawer,
   useValidateConnection,
   useWatchNodeFormDataChange,
 } from '../hooks';
 import { BeginQuery } from '../interface';
-import JsonUploadModal from '../json-upload-modal';
 import RunDrawer from '../run-drawer';
 import { ButtonEdge } from './edge';
 import styles from './index.less';
 import { RagNode } from './node';
 import { BeginNode } from './node/begin-node';
 import { CategorizeNode } from './node/categorize-node';
-import { EmailNode } from './node/email-node';
 import { GenerateNode } from './node/generate-node';
 import { InvokeNode } from './node/invoke-node';
 import { KeywordNode } from './node/keyword-node';
@@ -63,7 +52,6 @@ const nodeTypes = {
   keywordNode: KeywordNode,
   invokeNode: InvokeNode,
   templateNode: TemplateNode,
-  emailNode: EmailNode,
 };
 
 const edgeTypes = {
@@ -124,14 +112,6 @@ function FlowCanvas({ drawerVisible, hideDrawer }: IProps) {
   );
 
   const getBeginNodeDataQuery = useGetBeginNodeDataQuery();
-
-  const {
-    handleExportJson,
-    handleImportJson,
-    fileUploadVisible,
-    onFileUploadOk,
-    hideFileUploadModal,
-  } = useHandleExportOrImportJsonFile();
 
   useEffect(() => {
     if (drawerVisible) {
@@ -210,28 +190,7 @@ function FlowCanvas({ drawerVisible, hideDrawer }: IProps) {
         deleteKeyCode={['Delete', 'Backspace']}
       >
         <Background />
-        <Controls>
-          <ControlButton onClick={handleImportJson}>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger>
-                  <FolderInput />
-                </TooltipTrigger>
-                <TooltipContent>Import</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </ControlButton>
-          <ControlButton onClick={handleExportJson}>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger>
-                  <FolderOutput />
-                </TooltipTrigger>
-                <TooltipContent>Export</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </ControlButton>
-        </Controls>
+        <Controls />
       </ReactFlow>
       {formDrawerVisible && (
         <FormDrawer
@@ -252,13 +211,6 @@ function FlowCanvas({ drawerVisible, hideDrawer }: IProps) {
           hideModal={hideRunOrChatDrawer}
           showModal={showChatModal}
         ></RunDrawer>
-      )}
-      {fileUploadVisible && (
-        <JsonUploadModal
-          onOk={onFileUploadOk}
-          visible={fileUploadVisible}
-          hideModal={hideFileUploadModal}
-        ></JsonUploadModal>
       )}
     </div>
   );

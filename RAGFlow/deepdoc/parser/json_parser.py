@@ -4,7 +4,6 @@
 
 import json
 from typing import Any
-
 from rag.nlp import find_codec
 class RAGFlowJsonParser:
     def __init__(
@@ -23,7 +22,7 @@ class RAGFlowJsonParser:
         txt = binary.decode(encoding, errors="ignore")
         json_data = json.loads(txt)
         chunks = self.split_json(json_data, True)   
-        sections = [json.dumps(line, ensure_ascii=False) for line in chunks if line]
+        sections = [json.dumps(l, ensure_ascii=False) for l in chunks if l]
         return sections
 
     @staticmethod
@@ -54,7 +53,7 @@ class RAGFlowJsonParser:
         
     def _json_split(
         self,
-        data,
+        data: dict[str, Any],
         current_path: list[str] | None,
         chunks: list[dict] | None,
     ) -> list[dict]:
@@ -87,16 +86,15 @@ class RAGFlowJsonParser:
 
     def split_json(
         self,
-        json_data,
+        json_data: dict[str, Any],
         convert_lists: bool = False,
     ) -> list[dict]:
         """Splits JSON into a list of JSON chunks"""
 
         if convert_lists:
-            preprocessed_data = self._list_to_dict_preprocessing(json_data)
-            chunks = self._json_split(preprocessed_data, None, None)
+            chunks = self._json_split(self._list_to_dict_preprocessing(json_data))
         else:
-            chunks = self._json_split(json_data, None, None)
+            chunks = self._json_split(json_data)
 
         # Remove the last chunk if it's empty
         if not chunks[-1]:

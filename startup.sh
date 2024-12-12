@@ -45,3 +45,30 @@ docker-compose down
 docker-compose up -d > /dev/null 2>&1
 
 # sleep 30
+
+# ===========
+
+sleep 5
+
+# https://ithelp.ithome.com.tw/m/articles/10369119
+
+apt-get update
+apt-get install -y python3-pip
+pip3 install huggingface-hub nltk
+
+echo $base_dir
+cd "$base_dir"
+# pwd
+cd ./RAGFlow/
+
+python3 ./download_deps.py
+docker build -f Dockerfile -t infiniflow/ragflow:dev 
+
+cd ./docker/
+docker compose down
+docker compose up -d > /dev/null 2>&1
+
+# docker compose down
+# docker compose up -d > /dev/null 2>&1
+
+# sleep 30

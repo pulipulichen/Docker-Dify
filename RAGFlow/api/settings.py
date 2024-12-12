@@ -163,10 +163,9 @@ def init_settings():
 
     global DOC_ENGINE, docStoreConn, retrievaler, kg_retrievaler
     DOC_ENGINE = os.environ.get('DOC_ENGINE', "elasticsearch")
-    lower_case_doc_engine = DOC_ENGINE.lower()
-    if lower_case_doc_engine == "elasticsearch":
+    if DOC_ENGINE == "elasticsearch":
         docStoreConn = rag.utils.es_conn.ESConnection()
-    elif lower_case_doc_engine == "infinity":
+    elif DOC_ENGINE == "infinity":
         docStoreConn = rag.utils.infinity_conn.InfinityConnection()
     else:
         raise Exception(f"Not supported doc engine: {DOC_ENGINE}")

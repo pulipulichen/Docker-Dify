@@ -104,8 +104,7 @@ class KnowledgebaseService(CommonService):
             cls.model.token_num,
             cls.model.chunk_num,
             cls.model.parser_id,
-            cls.model.parser_config,
-            cls.model.pagerank]
+            cls.model.parser_config]
         kbs = cls.model.select(*fields).join(Tenant, on=(
                 (Tenant.id == cls.model.tenant_id) & (Tenant.status == StatusEnum.VALID.value))).where(
             (cls.model.id == kb_id),

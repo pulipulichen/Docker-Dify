@@ -23,7 +23,6 @@ from rag.utils.doc_store_conn import (
     OrderByExpr,
 )
 
-logger = logging.getLogger('ragflow.infinity_conn')
 
 def equivalent_condition_to_str(condition: dict) -> str:
     assert "_id" not in condition
@@ -69,7 +68,7 @@ class InfinityConnection(DocStoreConnection):
             host, port = infinity_uri.split(":")
             infinity_uri = infinity.common.NetworkAddress(host, int(port))
         self.connPool = None
-        logger.info(f"Use Infinity {infinity_uri} as the doc engine.")
+        logging.info(f"Use Infinity {infinity_uri} as the doc engine.")
         for _ in range(24):
             try:
                 connPool = ConnectionPool(infinity_uri)
@@ -79,16 +78,16 @@ class InfinityConnection(DocStoreConnection):
                 self.connPool = connPool
                 if res.error_code == ErrorCode.OK and res.server_status=="started":
                     break
-                logger.warn(f"Infinity status: {res.server_status}. Waiting Infinity {infinity_uri} to be healthy.")
+                logging.warn(f"Infinity status: {res.server_status}. Waiting Infinity {infinity_uri} to be healthy.")
                 time.sleep(5)
             except Exception as e:
-                logger.warning(f"{str(e)}. Waiting Infinity {infinity_uri} to be healthy.")
+                logging.warning(f"{str(e)}. Waiting Infinity {infinity_uri} to be healthy.")
                 time.sleep(5)
         if self.connPool is None:
             msg = f"Infinity {infinity_uri} didn't become healthy in 120s."
-            logger.error(msg)
+            logging.error(msg)
             raise Exception(msg)
-        logger.info(f"Infinity {infinity_uri} is healthy.")
+        logging.info(f"Infinity {infinity_uri} is healthy.")
 
     """
     Database operations
@@ -163,7 +162,7 @@ class InfinityConnection(DocStoreConnection):
                     )
                     break
         self.connPool.release_conn(inf_conn)
-        logger.info(
+        logging.info(
             f"INFINITY created table {table_name}, vector size {vectorSize}"
         )
 
@@ -173,7 +172,7 @@ class InfinityConnection(DocStoreConnection):
         db_instance = inf_conn.get_database(self.dbName)
         db_instance.drop_table(table_name, ConflictType.Ignore)
         self.connPool.release_conn(inf_conn)
-        logger.info(f"INFINITY dropped table {table_name}")
+        logging.info(f"INFINITY dropped table {table_name}")
 
     def indexExist(self, indexName: str, knowledgebaseId: str) -> bool:
         table_name = f"{indexName}_{knowledgebaseId}"
@@ -184,7 +183,7 @@ class InfinityConnection(DocStoreConnection):
             self.connPool.release_conn(inf_conn)
             return True
         except Exception as e:
-            logger.warning(f"INFINITY indexExist {str(e)}")
+            logging.warning(f"INFINITY indexExist {str(e)}")
         return False
 
     """
@@ -231,7 +230,7 @@ class InfinityConnection(DocStoreConnection):
                 )
                 if len(filter_cond) != 0:
                     filter_fulltext = f"({filter_cond}) AND {filter_fulltext}"
-                logger.debug(f"filter_fulltext: {filter_fulltext}")
+                logging.debug(f"filter_fulltext: {filter_fulltext}")
                 minimum_should_match = matchExpr.extra_options.get("minimum_should_match", 0.0)
                 if isinstance(minimum_should_match, float):
                     str_minimum_should_match = str(int(minimum_should_match * 100)) + "%"
@@ -297,7 +296,7 @@ class InfinityConnection(DocStoreConnection):
                 df_list.append(kb_res)
         self.connPool.release_conn(inf_conn)
         res = concat_dataframes(df_list, selectFields)
-        logger.debug(f"INFINITY search tables: {str(table_list)}, result: {str(res)}")
+        logging.debug("INFINITY search tables: " + str(table_list))
         return res
 
     def get(
@@ -307,10 +306,8 @@ class InfinityConnection(DocStoreConnection):
         db_instance = inf_conn.get_database(self.dbName)
         df_list = list()
         assert isinstance(knowledgebaseIds, list)
-        table_list = list()
         for knowledgebaseId in knowledgebaseIds:
             table_name = f"{indexName}_{knowledgebaseId}"
-            table_list.append(table_name)
             table_instance = db_instance.get_table(table_name)
             kb_res = table_instance.output(["*"]).filter(f"id = '{chunkId}'").to_pl()
             if len(kb_res) != 0 and kb_res.shape[0] > 0:
@@ -318,7 +315,6 @@ class InfinityConnection(DocStoreConnection):
 
         self.connPool.release_conn(inf_conn)
         res = concat_dataframes(df_list, ["id"])
-        logger.debug(f"INFINITY get tables: {str(table_list)}, result: {str(res)}")
         res_fields = self.getFields(res, res.columns)
         return res_fields.get(chunkId, None)
 
@@ -332,7 +328,7 @@ class InfinityConnection(DocStoreConnection):
             table_instance = db_instance.get_table(table_name)
         except InfinityException as e:
             # src/common/status.cppm, kTableNotExist = 3022
-            if e.error_code != ErrorCode.TABLE_NOT_EXIST:
+            if e.error_code != 3022:
                 raise
             vector_size = 0
             patt = re.compile(r"q_(?P<vector_size>\d+)_vec")
@@ -350,36 +346,25 @@ class InfinityConnection(DocStoreConnection):
             assert "_id" not in d
             assert "id" in d
             for k, v in d.items():
-                if k in ["important_kwd", "question_kwd", "entities_kwd"]:
-                    assert isinstance(v, list)
-                    d[k] = "###".join(v)
-                elif k == 'kb_id':
-                    if isinstance(d[k], list):
-                        d[k] = d[k][0] # since d[k] is a list, but we need a str
-                elif k == "position_int":
-                    assert isinstance(v, list)
-                    arr = [num for row in v for num in row]
-                    d[k] = "_".join(f"{num:08x}" for num in arr)
-                elif k in ["page_num_int", "top_int", "position_int"]:
-                    assert isinstance(v, list)
-                    d[k] = "_".join(f"{num:08x}" for num in v)
+                if k.endswith("_kwd") and isinstance(v, list):
+                    d[k] = " ".join(v)
         ids = ["'{}'".format(d["id"]) for d in documents]
         str_ids = ", ".join(ids)
         str_filter = f"id IN ({str_ids})"
         table_instance.delete(str_filter)
         # for doc in documents:
-        #     logger.info(f"insert position_int: {doc['position_int']}")
-        # logger.info(f"InfinityConnection.insert {json.dumps(documents)}")
+        #     logging.info(f"insert position_list: {doc['position_list']}")
+        # logging.info(f"InfinityConnection.insert {json.dumps(documents)}")
         table_instance.insert(documents)
         self.connPool.release_conn(inf_conn)
-        logger.debug(f"inserted into {table_name} {str_ids}.")
+        logging.debug(f"inserted into {table_name} {str_ids}.")
         return []
 
     def update(
             self, condition: dict, newValue: dict, indexName: str, knowledgebaseId: str
     ) -> bool:
-        # if 'position_int' in newValue:
-        #     logger.info(f"update position_int: {newValue['position_int']}")
+        # if 'position_list' in newValue:
+        #     logging.info(f"upsert position_list: {newValue['position_list']}")
         inf_conn = self.connPool.get_conn()
         db_instance = inf_conn.get_database(self.dbName)
         table_name = f"{indexName}_{knowledgebaseId}"
@@ -388,16 +373,6 @@ class InfinityConnection(DocStoreConnection):
         for k, v in newValue.items():
             if k.endswith("_kwd") and isinstance(v, list):
                 newValue[k] = " ".join(v)
-            elif k == 'kb_id':
-                if isinstance(newValue[k], list):
-                    newValue[k] = newValue[k][0] # since d[k] is a list, but we need a str
-            elif k == "position_int":
-                assert isinstance(v, list)
-                arr = [num for row in v for num in row]
-                newValue[k] = "_".join(f"{num:08x}" for num in arr)
-            elif k in ["page_num_int", "top_int"]:
-                assert isinstance(v, list)
-                newValue[k] = "_".join(f"{num:08x}" for num in v)
         table_instance.update(filter, newValue)
         self.connPool.release_conn(inf_conn)
         return True
@@ -410,7 +385,7 @@ class InfinityConnection(DocStoreConnection):
         try:
             table_instance = db_instance.get_table(table_name)
         except Exception:
-            logger.warning(
+            logging.warning(
                 f"Skipped deleting `{filter}` from table {table_name} since the table doesn't exist."
             )
             return 0
@@ -444,22 +419,9 @@ class InfinityConnection(DocStoreConnection):
                 v = res[fieldnm][i]
                 if isinstance(v, Series):
                     v = list(v)
-                elif fieldnm in ["important_kwd", "question_kwd", "entities_kwd"]:
+                elif fieldnm == "important_kwd":
                     assert isinstance(v, str)
-                    v = [kwd for kwd in v.split("###") if kwd]
-                elif fieldnm == "position_int":
-                    assert isinstance(v, str)
-                    if v:
-                        arr = [int(hex_val, 16) for hex_val in v.split('_')]
-                        v = [arr[i:i + 4] for i in range(0, len(arr), 4)]
-                    else:
-                        v = []
-                elif fieldnm in ["page_num_int", "top_int"]:
-                    assert isinstance(v, str)
-                    if v:
-                        v = [int(hex_val, 16) for hex_val in v.split('_')]
-                    else:
-                        v = []
+                    v = v.split()
                 else:
                     if not isinstance(v, str):
                         v = str(v)

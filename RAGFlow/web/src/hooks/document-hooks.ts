@@ -1,4 +1,3 @@
-import { IReferenceChunk } from '@/interfaces/database/chat';
 import { IDocumentInfo } from '@/interfaces/database/document';
 import { IChunk } from '@/interfaces/database/knowledge';
 import { IChangeParserConfigRequestBody } from '@/interfaces/request/document';
@@ -33,9 +32,7 @@ export const useGetDocumentUrl = (documentId?: string) => {
   return getDocumentUrl;
 };
 
-export const useGetChunkHighlights = (
-  selectedChunk: IChunk | IReferenceChunk,
-) => {
+export const useGetChunkHighlights = (selectedChunk: IChunk) => {
   const [size, setSize] = useState({ width: 849, height: 1200 });
 
   const highlights: IHighlight[] = useMemo(() => {

@@ -2,9 +2,7 @@ import {
   useGetChunkHighlights,
   useGetDocumentUrl,
 } from '@/hooks/document-hooks';
-import { IReferenceChunk } from '@/interfaces/database/chat';
 import { IChunk } from '@/interfaces/database/knowledge';
-import FileError from '@/pages/document-viewer/file-error';
 import { Skeleton } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -15,12 +13,13 @@ import {
   PdfLoader,
   Popup,
 } from 'react-pdf-highlighter';
-import { useCatchDocumentError } from './hooks';
 
+import FileError from '@/pages/document-viewer/file-error';
+import { useCatchDocumentError } from './hooks';
 import styles from './index.less';
 
 interface IProps {
-  chunk: IChunk | IReferenceChunk;
+  chunk: IChunk;
   documentId: string;
   visible: boolean;
 }

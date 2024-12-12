@@ -1,16 +1,7 @@
 import { useTranslate } from '@/hooks/common-hooks';
 import { IModalProps } from '@/interfaces/common';
 import { IAddLlmRequestBody } from '@/interfaces/request/llm';
-import {
-  Flex,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
-  Select,
-  Space,
-  Switch,
-} from 'antd';
+import { Flex, Form, Input, Modal, Select, Space, Switch, InputNumber } from 'antd';
 import omit from 'lodash/omit';
 
 type FieldType = IAddLlmRequestBody & { vision: boolean };
@@ -54,7 +45,7 @@ const OllamaModal = ({
       ...omit(values, ['vision']),
       model_type: modelType,
       llm_factory: llmFactory,
-      max_tokens: values.max_tokens,
+      max_tokens:values.max_tokens,
     };
     console.info(data);
 

@@ -1,6 +1,5 @@
 import { MessageType } from '@/constants/chat';
 import { IConversation, IReference } from '@/interfaces/database/chat';
-import { isEmpty } from 'lodash';
 import { EmptyConversationId } from './constants';
 import { IMessage } from './interface';
 
@@ -35,18 +34,9 @@ export const buildMessageItemReference = (
   const referenceIndex = assistantMessages.findIndex(
     (x) => x.id === message.id,
   );
-  const reference = !isEmpty(message?.reference)
+  const reference = message?.reference
     ? message?.reference
-    : (conversation?.reference ?? [])[referenceIndex];
+    : (conversation?.reference ?? {})[referenceIndex];
 
-  return reference ?? { doc_aggs: [], chunks: [], total: 0 };
-};
-
-const oldReg = /(#{2}\d+\${2})/g;
-
-// To be compatible with the old index matching mode
-export const replaceTextByOldReg = (text: string) => {
-  return text.replace(oldReg, function (substring) {
-    return `~~${substring.slice(2, -2)}==`;
-  });
+  return reference;
 };

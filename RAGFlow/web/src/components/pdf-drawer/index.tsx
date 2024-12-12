@@ -1,12 +1,11 @@
 import { IModalProps } from '@/interfaces/common';
-import { IReferenceChunk } from '@/interfaces/database/chat';
 import { IChunk } from '@/interfaces/database/knowledge';
 import { Drawer } from 'antd';
 import DocumentPreviewer from '../pdf-previewer';
 
 interface IProps extends IModalProps<any> {
   documentId: string;
-  chunk: IChunk | IReferenceChunk;
+  chunk: IChunk;
 }
 
 export const PdfDrawer = ({

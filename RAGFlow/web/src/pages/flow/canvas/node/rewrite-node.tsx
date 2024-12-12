@@ -1,5 +1,4 @@
 import LLMLabel from '@/components/llm-select/llm-label';
-import { useTheme } from '@/components/theme-provider';
 import classNames from 'classnames';
 import { get } from 'lodash';
 import { Handle, NodeProps, Position } from 'reactflow';
@@ -14,16 +13,11 @@ export function RewriteNode({
   isConnectable = true,
   selected,
 }: NodeProps<NodeData>) {
-  const { theme } = useTheme();
   return (
     <section
-      className={classNames(
-        styles.logicNode,
-        theme === 'dark' ? styles.dark : '',
-        {
-          [styles.selectedNode]: selected,
-        },
-      )}
+      className={classNames(styles.logicNode, {
+        [styles.selectedNode]: selected,
+      })}
     >
       <Handle
         id="c"

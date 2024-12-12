@@ -1,4 +1,5 @@
 import { MessageType } from '@/constants/chat';
+import { IChunk } from './knowledge';
 
 export interface PromptConfig {
   empty_response: string;
@@ -34,7 +35,7 @@ export interface IDialog {
   description: string;
   icon: string;
   id: string;
-  dialog_id: string;
+  dialog_id?: string;
   kb_ids: string[];
   kb_names: string[];
   language: string;
@@ -74,21 +75,8 @@ export interface Message {
   audio_binary?: string;
 }
 
-export interface IReferenceChunk {
-  id: string;
-  content: null;
-  document_id: string;
-  document_name: string;
-  dataset_id: string;
-  image_id: string;
-  similarity: number;
-  vector_similarity: number;
-  term_similarity: number;
-  positions: number[];
-}
-
 export interface IReference {
-  chunks: IReferenceChunk[];
+  chunks: IChunk[];
   doc_aggs: Docagg[];
   total: number;
 }
@@ -129,7 +117,6 @@ export interface IToken {
   token: string;
   update_date?: any;
   update_time?: any;
-  beta: string;
 }
 
 export interface IStats {

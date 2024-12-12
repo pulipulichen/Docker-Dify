@@ -18,13 +18,12 @@ import binascii
 import os
 import json
 import re
-from collections import defaultdict
 from copy import deepcopy
 from timeit import default_timer as timer
 import datetime
 from datetime import timedelta
 from api.db import LLMType, ParserType,StatusEnum
-from api.db.db_models import Dialog, DB
+from api.db.db_models import Dialog, Conversation,DB
 from api.db.services.common_service import CommonService
 from api.db.services.knowledgebase_service import KnowledgebaseService
 from api.db.services.llm_service import LLMService, TenantLLMService, LLMBundle
@@ -61,6 +60,27 @@ class DialogService(CommonService):
         return list(chats.dicts())
 
 
+class ConversationService(CommonService):
+    model = Conversation
+
+    @classmethod
+    @DB.connection_context()
+    def get_list(cls,dialog_id,page_number, items_per_page, orderby, desc, id , name):
+        sessions = cls.model.select().where(cls.model.dialog_id ==dialog_id)
+        if id:
+            sessions = sessions.where(cls.model.id == id)
+        if name:
+            sessions = sessions.where(cls.model.name == name)
+        if desc:
+            sessions = sessions.order_by(cls.model.getter_by(orderby).desc())
+        else:
+            sessions = sessions.order_by(cls.model.getter_by(orderby).asc())
+
+        sessions = sessions.paginate(page_number, items_per_page)
+
+        return list(sessions.dicts())
+
+
 def message_fit_in(msg, max_length=4000):
     def count():
         nonlocal msg
@@ -86,21 +106,21 @@ def message_fit_in(msg, max_length=4000):
         return c, msg
 
     ll = num_tokens_from_string(msg_[0]["content"])
-    ll2 = num_tokens_from_string(msg_[-1]["content"])
-    if ll / (ll + ll2) > 0.8:
+    l = num_tokens_from_string(msg_[-1]["content"])
+    if ll / (ll + l) > 0.8:
         m = msg_[0]["content"]
-        m = encoder.decode(encoder.encode(m)[:max_length - ll2])
+        m = encoder.decode(encoder.encode(m)[:max_length - l])
         msg[0]["content"] = m
         return max_length, msg
 
     m = msg_[1]["content"]
-    m = encoder.decode(encoder.encode(m)[:max_length - ll2])
+    m = encoder.decode(encoder.encode(m)[:max_length - l])
     msg[1]["content"] = m
     return max_length, msg
 
 
 def llm_id2llm_type(llm_id):
-    llm_id, _ = TenantLLMService.split_model_name_and_factory(llm_id)
+    llm_id = llm_id.split("@")[0]
     fnm = os.path.join(get_project_base_directory(), "conf")
     llm_factories = json.load(open(os.path.join(fnm, "llm_factories.json"), "r"))
     for llm_factory in llm_factories["factory_llm_infos"]:
@@ -109,36 +129,14 @@ def llm_id2llm_type(llm_id):
                 return llm["model_type"].strip(",")[-1]
 
 
-def kb_prompt(kbinfos, max_tokens):
-    knowledges = [ck["content_with_weight"] for ck in kbinfos["chunks"]]
-    used_token_count = 0
-    chunks_num = 0
-    for i, c in enumerate(knowledges):
-        used_token_count += num_tokens_from_string(c)
-        chunks_num += 1
-        if max_tokens * 0.97 < used_token_count:
-            knowledges = knowledges[:i]
-            break
-
-    doc2chunks = defaultdict(list)
-    for i, ck in enumerate(kbinfos["chunks"]):
-        if i >= chunks_num:
-            break
-        doc2chunks["docnm_kwd"].append(ck["content_with_weight"])
-
-    knowledges = []
-    for nm, chunks in doc2chunks.items():
-        txt = f"Document: {nm} \nContains the following relevant fragments:\n"
-        for i, chunk in enumerate(chunks, 1):
-            txt += f"{i}. {chunk}\n"
-        knowledges.append(txt)
-    return knowledges
-
-
 def chat(dialog, messages, stream=True, **kwargs):
     assert messages[-1]["role"] == "user", "The last content of this conversation is not from user."
     st = timer()
-    llm_id, fid = TenantLLMService.split_model_name_and_factory(dialog.llm_id)
+    tmp = dialog.llm_id.split("@")
+    fid = None
+    llm_id = tmp[0]
+    if len(tmp)>1: fid = tmp[1]
+
     llm = LLMService.query(llm_name=llm_id) if not fid else LLMService.query(llm_name=llm_id, fid=fid)
     if not llm:
         llm = TenantLLMService.query(tenant_id=dialog.tenant_id, llm_name=llm_id) if not fid else \
@@ -222,7 +220,7 @@ def chat(dialog, messages, stream=True, **kwargs):
                                         dialog.vector_similarity_weight,
                                         doc_ids=attachments,
                                         top=dialog.top_k, aggs=False, rerank_mdl=rerank_mdl)
-    knowledges = kb_prompt(kbinfos, max_tokens)
+    knowledges = [ck["content_with_weight"] for ck in kbinfos["chunks"]]
     logging.debug(
         "{}->{}".format(" ".join(questions), "\n->".join(knowledges)))
     retrieval_tm = timer()
@@ -263,8 +261,7 @@ def chat(dialog, messages, stream=True, **kwargs):
             idx = set([kbinfos["chunks"][int(i)]["doc_id"] for i in idx])
             recall_docs = [
                 d for d in kbinfos["doc_aggs"] if d["doc_id"] in idx]
-            if not recall_docs:
-                recall_docs = kbinfos["doc_aggs"]
+            if not recall_docs: recall_docs = kbinfos["doc_aggs"]
             kbinfos["doc_aggs"] = recall_docs
 
             refs = deepcopy(kbinfos)
@@ -273,7 +270,7 @@ def chat(dialog, messages, stream=True, **kwargs):
                     del c["vector"]
 
         if answer.lower().find("invalid key") >= 0 or answer.lower().find("invalid api") >= 0:
-            answer += " Please set LLM API-Key in 'User Setting -> Model providers -> API-Key'"
+            answer += " Please set LLM API-Key in 'User Setting -> Model Providers -> API-Key'"
         done_tm = timer()
         prompt += "\n\n### Elapsed\n  - Refine Question: %.1f ms\n  - Keywords: %.1f ms\n  - Retrieval: %.1f ms\n  - LLM: %.1f ms" % (
             (refineQ_tm - st) * 1000, (keyword_tm - refineQ_tm) * 1000, (retrieval_tm - keyword_tm) * 1000,
@@ -440,15 +437,13 @@ def relevant(tenant_id, llm_id, question, contents: list):
         Give a binary score 'yes' or 'no' score to indicate whether the document is relevant to the question.
         No other words needed except 'yes' or 'no'.
     """
-    if not contents:
-        return False
+    if not contents:return False
     contents = "Documents: \n" + "   - ".join(contents)
     contents = f"Question: {question}\n" + contents
     if num_tokens_from_string(contents) >= chat_mdl.max_length - 4:
         contents = encoder.decode(encoder.encode(contents)[:chat_mdl.max_length - 4])
     ans = chat_mdl.chat(prompt, [{"role": "user", "content": contents}], {"temperature": 0.01})
-    if ans.lower().find("yes") >= 0:
-        return True
+    if ans.lower().find("yes") >= 0: return True
     return False
 
 
@@ -490,10 +485,8 @@ Requirements:
     ]
     _, msg = message_fit_in(msg, chat_mdl.max_length)
     kwd = chat_mdl.chat(prompt, msg[1:], {"temperature": 0.2})
-    if isinstance(kwd, tuple):
-        kwd = kwd[0]
-    if kwd.find("**ERROR**") >=0:
-        return ""
+    if isinstance(kwd, tuple): kwd = kwd[0]
+    if kwd.find("**ERROR**") >=0: return ""
     return kwd
 
 
@@ -519,10 +512,8 @@ Requirements:
     ]
     _, msg = message_fit_in(msg, chat_mdl.max_length)
     kwd = chat_mdl.chat(prompt, msg[1:], {"temperature": 0.2})
-    if isinstance(kwd, tuple):
-        kwd = kwd[0]
-    if kwd.find("**ERROR**") >= 0:
-        return ""
+    if isinstance(kwd, tuple): kwd = kwd[0]
+    if kwd.find("**ERROR**") >= 0: return ""
     return kwd
 
 
@@ -533,8 +524,7 @@ def full_question(tenant_id, llm_id, messages):
         chat_mdl = LLMBundle(tenant_id, LLMType.CHAT, llm_id)
     conv = []
     for m in messages:
-        if m["role"] not in ["user", "assistant"]:
-            continue
+        if m["role"] not in ["user", "assistant"]: continue
         conv.append("{}: {}".format(m["role"].upper(), m["content"]))
     conv = "\n".join(conv)
     today = datetime.date.today().isoformat()
@@ -595,8 +585,7 @@ Output: What's the weather in Rochester on {tomorrow}?
 
 
 def tts(tts_mdl, text):
-    if not tts_mdl or not text:
-        return
+    if not tts_mdl or not text: return
     bin = b""
     for chunk in tts_mdl.tts(text):
         bin += chunk
@@ -605,6 +594,7 @@ def tts(tts_mdl, text):
 
 def ask(question, kb_ids, tenant_id):
     kbs = KnowledgebaseService.get_by_ids(kb_ids)
+    tenant_ids = [kb.tenant_id for kb in kbs]
     embd_nms = list(set([kb.embd_id for kb in kbs]))
 
     is_kg = all([kb.parser_id == ParserType.KG for kb in kbs])
@@ -613,9 +603,17 @@ def ask(question, kb_ids, tenant_id):
     embd_mdl = LLMBundle(tenant_id, LLMType.EMBEDDING, embd_nms[0])
     chat_mdl = LLMBundle(tenant_id, LLMType.CHAT)
     max_tokens = chat_mdl.max_length
-    tenant_ids = list(set([kb.tenant_id for kb in kbs]))
+
     kbinfos = retr.retrieval(question, embd_mdl, tenant_ids, kb_ids, 1, 12, 0.1, 0.3, aggs=False)
-    knowledges = kb_prompt(kbinfos, max_tokens)
+    knowledges = [ck["content_with_weight"] for ck in kbinfos["chunks"]]
+
+    used_token_count = 0
+    for i, c in enumerate(knowledges):
+        used_token_count += num_tokens_from_string(c)
+        if max_tokens * 0.97 < used_token_count:
+            knowledges = knowledges[:i]
+            break
+
     prompt = """
     Role: You're a smart assistant. Your name is Miss R.
     Task: Summarize the information from knowledge bases and answer user's question.
@@ -625,30 +623,29 @@ def ask(question, kb_ids, tenant_id):
       - Answer with markdown format text.
       - Answer in language of user's question.
       - DO NOT make things up, especially for numbers.
-
+      
     ### Information from knowledge bases
     %s
-
+    
     The above is information from knowledge bases.
-
-    """ % "\n".join(knowledges)
+     
+    """%"\n".join(knowledges)
     msg = [{"role": "user", "content": question}]
 
     def decorate_answer(answer):
         nonlocal knowledges, kbinfos, prompt
         answer, idx = retr.insert_citations(answer,
-                                            [ck["content_ltks"]
-                                             for ck in kbinfos["chunks"]],
-                                            [ck["vector"]
-                                             for ck in kbinfos["chunks"]],
-                                            embd_mdl,
-                                            tkweight=0.7,
-                                            vtweight=0.3)
+                                           [ck["content_ltks"]
+                                            for ck in kbinfos["chunks"]],
+                                           [ck["vector"]
+                                            for ck in kbinfos["chunks"]],
+                                           embd_mdl,
+                                           tkweight=0.7,
+                                           vtweight=0.3)
         idx = set([kbinfos["chunks"][int(i)]["doc_id"] for i in idx])
         recall_docs = [
             d for d in kbinfos["doc_aggs"] if d["doc_id"] in idx]
-        if not recall_docs:
-            recall_docs = kbinfos["doc_aggs"]
+        if not recall_docs: recall_docs = kbinfos["doc_aggs"]
         kbinfos["doc_aggs"] = recall_docs
         refs = deepcopy(kbinfos)
         for c in refs["chunks"]:

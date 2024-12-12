@@ -1,14 +1,3 @@
-export enum Routes {
-  Login = '/login',
-  Home = '/home',
-  Datasets = '/datasets',
-  DatasetBase = '/dataset',
-  Dataset = `${Routes.DatasetBase}${Routes.DatasetBase}`,
-  Agent = '/agent',
-  Search = '/next-search',
-  Chat = '/next-chat',
-}
-
 const routes = [
   {
     path: '/login',
@@ -78,10 +67,6 @@ const routes = [
             component: '@/pages/user-setting/setting-profile',
           },
           {
-            path: '/user-setting/locale',
-            component: '@/pages/user-setting/setting-locale',
-          },
-          {
             path: '/user-setting/password',
             component: '@/pages/user-setting/setting-password',
           },
@@ -142,81 +127,42 @@ const routes = [
     layout: false,
   },
   {
-    path: Routes.Home,
+    path: '/home',
+    layout: false,
+    component: '@/pages/home',
+  },
+  {
+    path: '/datasets',
     layout: false,
     component: '@/layouts/next',
     routes: [
       {
-        path: Routes.Home,
-        component: `@/pages${Routes.Home}`,
+        path: '/datasets',
+        component: '@/pages/datasets',
       },
     ],
   },
   {
-    path: Routes.Datasets,
+    path: '/dataset',
     layout: false,
     component: '@/layouts/next',
     routes: [
+      { path: '/dataset', redirect: '/dataset/dataset' },
       {
-        path: Routes.Datasets,
-        component: `@/pages${Routes.Datasets}`,
-      },
-    ],
-  },
-  {
-    path: Routes.Chat,
-    layout: false,
-    component: '@/layouts/next',
-    routes: [
-      {
-        path: Routes.Chat,
-        component: `@/pages${Routes.Chat}`,
-      },
-    ],
-  },
-  {
-    path: Routes.Search,
-    layout: false,
-    component: '@/layouts/next',
-    routes: [
-      {
-        path: Routes.Search,
-        component: `@/pages${Routes.Search}`,
-      },
-    ],
-  },
-  {
-    path: Routes.Agent,
-    layout: false,
-    component: '@/layouts/next',
-    routes: [
-      {
-        path: Routes.Agent,
-        component: `@/pages${Routes.Agent}`,
-      },
-    ],
-  },
-  {
-    path: Routes.DatasetBase,
-    layout: false,
-    component: '@/layouts/next',
-    routes: [
-      { path: Routes.DatasetBase, redirect: Routes.Dataset },
-      {
-        path: Routes.DatasetBase,
-        component: `@/pages${Routes.DatasetBase}`,
+        path: '/dataset',
+        component: '@/pages/dataset',
         routes: [
           {
-            path: Routes.Dataset,
-            component: `@/pages${Routes.Dataset}`,
+            path: '/dataset/dataset',
+            component: '@/pages/dataset/dataset',
           },
           {
-            path: `${Routes.DatasetBase}/configuration`,
-            component: `@/pages${Routes.DatasetBase}/settings`,
+            path: '/dataset/configuration',
+            component: '@/pages/dataset/settings',
           },
           {
-            path: `${Routes.DatasetBase}/testing`,
-            component: `@/pages${Routes.DatasetBase}/testing`,
+            path: '/dataset/testing',
+            component: '@/pages/dataset/testing',
           },
         ],
       },

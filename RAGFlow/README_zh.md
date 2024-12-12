@@ -54,9 +54,9 @@
 
 ## 🔥 近期更新
 
-- 2024-12-04 支持知识库的 Pagerank 分数。
 - 2024-11-22 完善了 Agent 中的变量定义和使用。
 - 2024-11-01 对解析后的 chunk 加入关键词抽取和相关问题生成以提高召回的准确度。
+- 2024-09-13 增加知识库问答搜索模式。
 - 2024-08-22 支持用 RAG 技术实现从自然语言到 SQL 语句的转换。
 - 2024-08-02 支持 GraphRAG 启发于 [graphrag](https://github.com/microsoft/graphrag) 和思维导图。
 
@@ -142,22 +142,18 @@
 
 3. 进入 **docker** 文件夹，利用提前编译好的 Docker 镜像启动服务器：
 
-   > 运行以下命令会自动下载 RAGFlow slim Docker 镜像 `v0.14.1-slim`。请参考下表查看不同 Docker 发行版的描述。如需下载不同于 `v0.14.0-slim` 的 Docker 镜像，请在运行 `docker compose` 启动服务之前先更新 **docker/.env** 文件内的 `RAGFLOW_IMAGE` 变量。比如，你可以通过设置 `RAGFLOW_IMAGE=infiniflow/ragflow:v0.14.1` 来下载 RAGFlow 镜像的 `v0.14.1` 完整发行版。
+   > 运行以下命令会自动下载 dev 版的 RAGFlow slim Docker 镜像（`dev-slim`），该镜像并不包含 embedding 模型以及一些 Python 库，因此镜像大小约 1GB。
 
    ```bash
-   $ cd ragflow
-   $ docker compose -f docker/docker-compose.yml up -d
+   $ cd ragflow/docker
+   $ docker compose -f docker-compose.yml up -d
    ```
 
-   | RAGFlow image tag | Image size (GB) | Has embedding models? | Stable?                  |
-   | ----------------- | --------------- | --------------------- | ------------------------ |
-   | v0.14.1           | &approx;9       | :heavy_check_mark:    | Stable release           |
-   | v0.14.1-slim      | &approx;2       | ❌                    | Stable release           |
-   | v0.15.0-dev1      | &approx;9       | :heavy_check_mark:    | *Unstable* beta release  |
-   | v0.15.0-dev1-slim | &approx;2       | ❌                    | *Unstable* beta release  |
-   | nightly           | &approx;9       | :heavy_check_mark:    | *Unstable* nightly build |
-   | nightly-slim      | &approx;2       | ❌                    | *Unstable* nightly build |
-
+   > - 如果你想下载并运行特定版本的 RAGFlow slim Docker 镜像，请在 **docker/.env** 文件中找到 `RAGFLOW_IMAGE` 变量，将其改为对应版本。例如 `RAGFLOW_IMAGE=infiniflow/ragflow:v0.14.1-slim`，然后再运行上述命令。
+   > - 如果您想安装内置 embedding 模型和 Python 库的 dev 版本的 Docker 镜像，需要将 **docker/.env** 文件中的 `RAGFLOW_IMAGE` 变量修改为： `RAGFLOW_IMAGE=infiniflow/ragflow:dev`。
+   > - 如果您想安装内置 embedding 模型和 Python 库的指定版本的 RAGFlow Docker 镜像，需要将 **docker/.env** 文件中的 `RAGFLOW_IMAGE` 变量修改为： `RAGFLOW_IMAGE=infiniflow/ragflow:v0.14.1`。修改后，再运行上面的命令。
+   > **注意：** 安装内置 embedding 模型和 Python 库的指定版本的 RAGFlow Docker 镜像大小约 9 GB，可能需要更长时间下载，请耐心等待。
+   
 4. 服务器启动成功后再次确认服务器状态：
 
    ```bash
@@ -182,7 +178,7 @@
 
 5. 在你的浏览器中输入你的服务器对应的 IP 地址并登录 RAGFlow。
    > 上面这个例子中，您只需输入 http://IP_OF_YOUR_MACHINE 即可：未改动过配置则无需输入端口（默认的 HTTP 服务端口 80）。
-6. 在 [service_conf.yaml.template](./docker/service_conf.yaml.template) 文件的 `user_default_llm` 栏配置 LLM factory，并在 `API_KEY` 栏填写和你选择的大模型相对应的 API key。
+6. 在 [service_conf.yaml](./docker/service_conf.yaml) 文件的 `user_default_llm` 栏配置 LLM factory，并在 `API_KEY` 栏填写和你选择的大模型相对应的 API key。
 
    > 详见 [llm_api_key_setup](https://ragflow.io/docs/dev/llm_api_key_setup)。
 
@@ -193,21 +189,21 @@
 系统配置涉及以下三份文件：
 
 - [.env](./docker/.env)：存放一些基本的系统环境变量，比如 `SVR_HTTP_PORT`、`MYSQL_PASSWORD`、`MINIO_PASSWORD` 等。
-- [service_conf.yaml.template](./docker/service_conf.yaml.template)：配置各类后台服务。
+- [service_conf.yaml](./docker/service_conf.yaml)：配置各类后台服务。
 - [docker-compose.yml](./docker/docker-compose.yml): 系统依赖该文件完成启动。
 
-请务必确保 [.env](./docker/.env) 文件中的变量设置与 [service_conf.yaml.template](./docker/service_conf.yaml.template) 文件中的配置保持一致！
+请务必确保 [.env](./docker/.env) 文件中的变量设置与 [service_conf.yaml](./docker/service_conf.yaml) 文件中的配置保持一致！
 
-如果不能访问镜像站点 hub.docker.com 或者模型站点 huggingface.co，请按照 [.env](./docker/.env) 注释修改 `RAGFLOW_IMAGE` 和 `HF_ENDPOINT`。
+如果不能访问镜像站点hub.docker.com或者模型站点huggingface.co，请按照[.env](./docker/.env)注释修改`RAGFLOW_IMAGE`和`HF_ENDPOINT`。
 
-> [./docker/README](./docker/README.md) 解释了 [service_conf.yaml.template](./docker/service_conf.yaml.template) 用到的环境变量设置和服务配置。
+> [./docker/README](./docker/README.md) 文件提供了环境变量设置和服务配置的详细信息。请**一定要**确保 [./docker/README](./docker/README.md) 文件当中列出来的环境变量的值与 [service_conf.yaml](./docker/service_conf.yaml) 文件当中的系统配置保持一致。
 
 如需更新默认的 HTTP 服务端口(80), 可以在 [docker-compose.yml](./docker/docker-compose.yml) 文件中将配置 `80:80` 改为 `<YOUR_SERVING_PORT>:80`。
 
 > 所有系统配置都需要通过系统重启生效：
 >
 > ```bash
-> $ docker compose -f docker/docker-compose.yml up -d
+> $ docker compose -f docker-compose.yml up -d
 > ```
 
 ### 把文档引擎从 Elasticsearch 切换成为 Infinity
@@ -234,12 +230,14 @@ RAGFlow 默认使用 Elasticsearch 存储文本和向量数据. 如果要切换�
 
 ## 🔧 源码编译 Docker 镜像（不含 embedding 模型）
 
-本 Docker 镜像大小约 2 GB 左右并且依赖外部的大模型和 embedding 服务。
+本 Docker 镜像大小约 1 GB 左右并且依赖外部的大模型和 embedding 服务。
 
 ```bash
 git clone https://github.com/infiniflow/ragflow.git
 cd ragflow/
-docker build --build-arg LIGHTEN=1 --build-arg NEED_MIRROR=1 -f Dockerfile -t infiniflow/ragflow:nightly-slim .
+pip3 install huggingface-hub nltk
+python3 download_deps.py
+docker build -f Dockerfile.slim -t infiniflow/ragflow:dev-slim .
 ```
 
 ## 🔧 源码编译 Docker 镜像（包含 embedding 模型）
@@ -249,23 +247,23 @@ docker build --build-arg LIGHTEN=1 --build-arg NEED_MIRROR=1 -f Dockerfile -t in
 ```bash
 git clone https://github.com/infiniflow/ragflow.git
 cd ragflow/
-docker build --build-arg NEED_MIRROR=1 -f Dockerfile -t infiniflow/ragflow:nightly .
+pip3 install huggingface-hub nltk
+python3 download_deps.py
+docker build -f Dockerfile -t infiniflow/ragflow:dev .
 ```
 
 ## 🔨 以源代码启动服务
 
 1. 安装 Poetry。如已经安装，可跳过本步骤：  
    ```bash
-   pipx install poetry
-   pipx inject poetry poetry-plugin-pypi-mirror
-   export POETRY_VIRTUALENVS_CREATE=true POETRY_VIRTUALENVS_IN_PROJECT=true
-   export POETRY_PYPI_MIRROR_URL=https://pypi.tuna.tsinghua.edu.cn/simple/
+   curl -sSL https://install.python-poetry.org | python3 -
    ```
 
 2. 下载源代码并安装 Python 依赖：  
    ```bash
    git clone https://github.com/infiniflow/ragflow.git
    cd ragflow/
+   export POETRY_VIRTUALENVS_CREATE=true POETRY_VIRTUALENVS_IN_PROJECT=true
    ~/.local/bin/poetry install --sync --no-root # install RAGFlow dependent python modules
    ```
 
@@ -274,10 +272,11 @@ docker build --build-arg NEED_MIRROR=1 -f Dockerfile -t infiniflow/ragflow:night
    docker compose -f docker/docker-compose-base.yml up -d
    ```
 
-   在 `/etc/hosts` 中添加以下代码，将 **conf/service_conf.yaml** 文件中的所有 host 地址都解析为 `127.0.0.1`：  
+   在 `/etc/hosts` 中添加以下代码，将 **docker/service_conf.yaml** 文件中的所有 host 地址都解析为 `127.0.0.1`：  
    ```
    127.0.0.1       es01 infinity mysql minio redis
    ```  
+   在文件 **docker/service_conf.yaml** 中，对照 **docker/.env** 的配置将 mysql 端口更新为 `5455`，es 端口更新为 `1200`。
 
 4. 如果无法访问 HuggingFace，可以把环境变量 `HF_ENDPOINT` 设成相应的镜像站点：  
  

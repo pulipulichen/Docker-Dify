@@ -1,5 +1,4 @@
-import { useTheme } from '@/components/theme-provider';
-import { useFetchKnowledgeList } from '@/hooks/knowledge-hooks';
+import { useNextFetchKnowledgeList } from '@/hooks/knowledge-hooks';
 import { UserOutlined } from '@ant-design/icons';
 import { Avatar, Flex } from 'antd';
 import classNames from 'classnames';
@@ -18,8 +17,7 @@ export function RetrievalNode({
   selected,
 }: NodeProps<NodeData>) {
   const knowledgeBaseIds: string[] = get(data, 'form.kb_ids', []);
-  const { theme } = useTheme();
-  const { list: knowledgeList } = useFetchKnowledgeList(true);
+  const { list: knowledgeList } = useNextFetchKnowledgeList(true);
   const knowledgeBases = useMemo(() => {
     return knowledgeBaseIds.map((x) => {
       const item = knowledgeList.find((y) => x === y.id);
@@ -33,13 +31,9 @@ export function RetrievalNode({
 
   return (
     <section
-      className={classNames(
-        styles.logicNode,
-        theme === 'dark' ? styles.dark : '',
-        {
-          [styles.selectedNode]: selected,
-        },
-      )}
+      className={classNames(styles.logicNode, {
+        [styles.selectedNode]: selected,
+      })}
     >
       <Handle
         id="c"

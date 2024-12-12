@@ -48,7 +48,7 @@ class Docx(DocxParser):
                     continue
                 if 'w:br' in run._element.xml and 'type="page"' in run._element.xml:
                     pn += 1
-        return [line for line in lines if line]
+        return [l for l in lines if l]
 
     def __call__(self, filename, binary=None, from_page=0, to_page=100000):
         self.doc = Document(
@@ -60,8 +60,7 @@ class Docx(DocxParser):
             if pn > to_page:
                 break
             question_level, p_text = docx_question_level(p, bull)
-            if not p_text.strip("\n"):
-                continue
+            if not p_text.strip("\n"):continue
             lines.append((question_level, p_text))
 
             for run in p.runs:
@@ -79,21 +78,19 @@ class Docx(DocxParser):
                 if lines[e][0] <= lines[s][0]:
                     break
                 e += 1
-            if e - s == 1 and visit[s]:
-                continue
+            if e - s == 1 and visit[s]: continue
             sec = []
             next_level = lines[s][0] + 1
             while not sec and next_level < 22:
                 for i in range(s+1, e):
-                    if lines[i][0] != next_level:
-                        continue
+                    if lines[i][0] != next_level: continue
                     sec.append(lines[i][1])
                     visit[i] = True
                 next_level += 1
             sec.insert(0, lines[s][1])
 
             sections.append("\n".join(sec))
-        return [s for s in sections if s]
+        return [l for l in sections if l]
 
     def __str__(self) -> str:
         return f'''
@@ -111,9 +108,7 @@ class Pdf(PdfParser):
 
     def __call__(self, filename, binary=None, from_page=0,
                  to_page=100000, zoomin=3, callback=None):
-        from timeit import default_timer as timer
-        start = timer()
-        callback(msg="OCR started")
+        callback(msg="OCR is running...")
         self.__images__(
             filename if not binary else binary,
             zoomin,
@@ -121,16 +116,17 @@ class Pdf(PdfParser):
             to_page,
             callback
         )
-        callback(msg="OCR finished ({:.2f}s)".format(timer() - start))
+        callback(msg="OCR finished")
 
+        from timeit import default_timer as timer
         start = timer()
         self._layouts_rec(zoomin)
-        callback(0.67, "Layout analysis ({:.2f}s)".format(timer() - start))
+        callback(0.67, "Layout analysis finished")
         logging.debug("layouts:".format(
             ))
         self._naive_vertical_merge()
 
-        callback(0.8, "Text extraction ({:.2f}s)".format(timer() - start))
+        callback(0.8, "Text extraction finished")
 
         return [(b["text"], self._line_tag(b, zoomin))
                 for b in self.boxes], None
@@ -171,13 +167,13 @@ def chunk(filename, binary=None, from_page=0, to_page=100000,
         callback(0.1, "Start to parse.")
         txt = get_text(filename, binary)
         sections = txt.split("\n")
-        sections = [s for s in sections if s]
+        sections = [l for l in sections if l]
         callback(0.8, "Finish parsing.")
 
     elif re.search(r"\.(htm|html)$", filename, re.IGNORECASE):
         callback(0.1, "Start to parse.")
         sections = HtmlParser()(filename, binary)
-        sections = [s for s in sections if s]
+        sections = [l for l in sections if l]
         callback(0.8, "Finish parsing.")
 
     elif re.search(r"\.doc$", filename, re.IGNORECASE):
@@ -185,7 +181,7 @@ def chunk(filename, binary=None, from_page=0, to_page=100000,
         binary = BytesIO(binary)
         doc_parsed = parser.from_buffer(binary)
         sections = doc_parsed['content'].split('\n')
-        sections = [s for s in sections if s]
+        sections = [l for l in sections if l]
         callback(0.8, "Finish parsing.")
 
     else:

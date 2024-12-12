@@ -1,4 +1,3 @@
-import { PromptIcon } from '@/assets/icon/Icon';
 import CopyToClipboard from '@/components/copy-to-clipboard';
 import { useSetModalState } from '@/hooks/common-hooks';
 import { IRemoveMessageById } from '@/hooks/logic-hooks';
@@ -13,6 +12,7 @@ import {
 import { Radio, Tooltip } from 'antd';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import SvgIcon from '../svg-icon';
 import FeedbackModal from './feedback-modal';
 import { useRemoveMessage, useSendFeedback, useSpeech } from './hooks';
 import PromptModal from './prompt-modal';
@@ -70,7 +70,7 @@ export const AssistantGroupButton = ({
         )}
         {prompt && (
           <Radio.Button value="e" onClick={showPromptModal}>
-            <PromptIcon style={{ fontSize: '16px' }} />
+            <SvgIcon name={`prompt`} width={16}></SvgIcon>
           </Radio.Button>
         )}
       </Radio.Group>

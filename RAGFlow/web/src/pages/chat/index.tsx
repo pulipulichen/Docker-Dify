@@ -29,20 +29,17 @@ import {
   useSelectDerivedConversationList,
 } from './hooks';
 
-import EmbedModal from '@/components/api-service/embed-modal';
-import { useShowEmbedModal } from '@/components/api-service/hooks';
 import SvgIcon from '@/components/svg-icon';
-import { useTheme } from '@/components/theme-provider';
-import { SharedFrom } from '@/constants/chat';
 import {
   useClickConversationCard,
   useClickDialogCard,
   useFetchNextDialogList,
   useGetChatSearchParams,
 } from '@/hooks/chat-hooks';
-import { useTranslate } from '@/hooks/common-hooks';
+import { useSetModalState, useTranslate } from '@/hooks/common-hooks';
 import { useSetSelectedRecord } from '@/hooks/logic-hooks';
 import { IDialog } from '@/interfaces/database/chat';
+import ChatIdModal from './chat-id-modal';
 import styles from './index.less';
 
 const { Text } = Typography;
@@ -54,7 +51,6 @@ const Chat = () => {
   const { handleClickDialog } = useClickDialogCard();
   const { handleClickConversation } = useClickConversationCard();
   const { dialogId, conversationId } = useGetChatSearchParams();
-  const { theme } = useTheme();
   const {
     list: conversationList,
     addTemporaryConversation,
@@ -84,10 +80,13 @@ const Chat = () => {
     showDialogEditModal,
   } = useEditDialog();
   const { t } = useTranslate('chat');
+  const {
+    visible: overviewVisible,
+    hideModal: hideOverviewModal,
+    showModal: showOverviewModal,
+  } = useSetModalState();
   const { currentRecord, setRecord } = useSetSelectedRecord<IDialog>();
   const [controller, setController] = useState(new AbortController());
-  const { showEmbedModal, hideEmbedModal, embedVisible, beta } =
-    useShowEmbedModal();
 
   const handleAppCardEnter = (id: string) => () => {
     handleItemEnter(id);
@@ -119,7 +118,7 @@ const Chat = () => {
       info?.domEvent?.preventDefault();
       info?.domEvent?.stopPropagation();
       setRecord(dialog);
-      showEmbedModal();
+      showOverviewModal();
     };
 
   const handleRemoveConversation =
@@ -192,7 +191,7 @@ const Chat = () => {
         label: (
           <Space>
             <KeyOutlined />
-            {t('publish', { keyPrefix: 'flow' })}
+            {t('overview')}
           </Space>
         ),
       },
@@ -244,9 +243,7 @@ const Chat = () => {
                   key={x.id}
                   hoverable
                   className={classNames(styles.chatAppCard, {
-                    [theme === 'dark'
-                      ? styles.chatAppCardSelectedDark
-                      : styles.chatAppCardSelected]: dialogId === x.id,
+                    [styles.chatAppCardSelected]: dialogId === x.id,
                   })}
                   onMouseEnter={handleAppCardEnter(x.id)}
                   onMouseLeave={handleItemLeave}
@@ -319,9 +316,7 @@ const Chat = () => {
                   onMouseEnter={handleConversationCardEnter(x.id)}
                   onMouseLeave={handleConversationItemLeave}
                   className={classNames(styles.chatTitleCard, {
-                    [theme === 'dark'
-                      ? styles.chatTitleCardSelectedDark
-                      : styles.chatTitleCardSelected]: x.id === conversationId,
+                    [styles.chatTitleCardSelected]: x.id === conversationId,
                   })}
                 >
                   <Flex justify="space-between" align="center">
@@ -333,19 +328,17 @@ const Chat = () => {
                         {x.name}
                       </Text>
                     </div>
-                    {conversationActivated === x.id &&
-                      x.id !== '' &&
-                      !x.is_new && (
-                        <section>
-                          <Dropdown
-                            menu={{ items: buildConversationItems(x.id) }}
-                          >
-                            <ChatAppCube
-                              className={styles.cubeIcon}
-                            ></ChatAppCube>
-                          </Dropdown>
-                        </section>
-                      )}
+                    {conversationActivated === x.id && x.id !== '' && (
+                      <section>
+                        <Dropdown
+                          menu={{ items: buildConversationItems(x.id) }}
+                        >
+                          <ChatAppCube
+                            className={styles.cubeIcon}
+                          ></ChatAppCube>
+                        </Dropdown>
+                      </section>
+                    )}
                   </Flex>
                 </Card>
               ))}
@@ -373,16 +366,14 @@ const Chat = () => {
         initialName={initialConversationName}
         loading={conversationRenameLoading}
       ></RenameModal>
-
-      {embedVisible && (
-        <EmbedModal
-          visible={embedVisible}
-          hideModal={hideEmbedModal}
-          token={currentRecord.id}
-          form={SharedFrom.Chat}
-          beta={beta}
-          isAgent={false}
-        ></EmbedModal>
+      {overviewVisible && (
+        <ChatIdModal
+          visible={overviewVisible}
+          hideModal={hideOverviewModal}
+          id={currentRecord.id}
+          name={currentRecord.name}
+          idKey="dialogId"
+        ></ChatIdModal>
       )}
     </Flex>
   );

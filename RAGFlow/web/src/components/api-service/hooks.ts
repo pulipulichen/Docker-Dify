@@ -6,7 +6,6 @@ import {
 } from '@/hooks/common-hooks';
 import {
   useCreateSystemToken,
-  useFetchManualSystemTokenList,
   useFetchSystemTokenList,
   useRemoveSystemToken,
 } from '@/hooks/user-setting-hooks';
@@ -18,7 +17,9 @@ import { useCallback } from 'react';
 export const useOperateApiKey = (idKey: string, dialogId?: string) => {
   const { removeToken } = useRemoveSystemToken();
   const { createToken, loading: creatingLoading } = useCreateSystemToken();
-  const { data: tokenList, loading: listLoading } = useFetchSystemTokenList();
+  const { data: tokenList, loading: listLoading } = useFetchSystemTokenList({
+    [idKey]: dialogId,
+  });
 
   const showDeleteConfirm = useShowDeleteConfirm();
 
@@ -71,68 +72,49 @@ export const useShowTokenEmptyError = () => {
   return { showTokenEmptyError };
 };
 
-export const useShowBetaEmptyError = () => {
-  const { t } = useTranslate('chat');
-
-  const showBetaEmptyError = useCallback(() => {
-    message.error(t('betaError'));
-  }, [t]);
-  return { showBetaEmptyError };
-};
-
 const getUrlWithToken = (token: string, from: string = 'chat') => {
   const { protocol, host } = window.location;
   return `${protocol}//${host}/chat/share?shared_id=${token}&from=${from}`;
 };
 
-const useFetchTokenListBeforeOtherStep = () => {
+const useFetchTokenListBeforeOtherStep = (idKey: string, dialogId?: string) => {
   const { showTokenEmptyError } = useShowTokenEmptyError();
-  const { showBetaEmptyError } = useShowBetaEmptyError();
 
-  const { data: tokenList, fetchSystemTokenList } =
-    useFetchManualSystemTokenList();
+  const { data: tokenList, refetch } = useFetchSystemTokenList({
+    [idKey]: dialogId,
+  });
 
-  let token = '',
-    beta = '';
-
-  if (Array.isArray(tokenList) && tokenList.length > 0) {
-    token = tokenList[0].token;
-    beta = tokenList[0].beta;
-  }
-
-  token =
+  const token =
     Array.isArray(tokenList) && tokenList.length > 0 ? tokenList[0].token : '';
 
   const handleOperate = useCallback(async () => {
-    const ret = await fetchSystemTokenList();
-    const list = ret;
+    const ret = await refetch();
+    const list = ret.data;
     if (Array.isArray(list) && list.length > 0) {
-      if (!list[0].beta) {
-        showBetaEmptyError();
-        return false;
-      }
       return list[0]?.token;
     } else {
       showTokenEmptyError();
       return false;
     }
-  }, [fetchSystemTokenList, showBetaEmptyError, showTokenEmptyError]);
+  }, [showTokenEmptyError, refetch]);
 
   return {
     token,
-    beta,
     handleOperate,
   };
 };
 
-export const useShowEmbedModal = () => {
+export const useShowEmbedModal = (idKey: string, dialogId?: string) => {
   const {
     visible: embedVisible,
     hideModal: hideEmbedModal,
     showModal: showEmbedModal,
   } = useSetModalState();
 
-  const { handleOperate, token, beta } = useFetchTokenListBeforeOtherStep();
+  const { handleOperate, token } = useFetchTokenListBeforeOtherStep(
+    idKey,
+    dialogId,
+  );
 
   const handleShowEmbedModal = useCallback(async () => {
     const succeed = await handleOperate();
@@ -146,12 +128,11 @@ export const useShowEmbedModal = () => {
     hideEmbedModal,
     embedVisible,
     embedToken: token,
-    beta,
   };
 };
 
-export const usePreviewChat = (idKey: string) => {
-  const { handleOperate } = useFetchTokenListBeforeOtherStep();
+export const usePreviewChat = (idKey: string, dialogId?: string) => {
+  const { handleOperate } = useFetchTokenListBeforeOtherStep(idKey, dialogId);
 
   const open = useCallback(
     (t: string) => {

@@ -2,6 +2,7 @@ import logging
 import requests
 from bridge.context import ContextType  # Import Context, ContextType
 from bridge.reply import Reply, ReplyType  # Import Reply, ReplyType
+from bridge import *
 from plugins import Plugin, register  # Import Plugin and register
 from plugins.event import Event, EventContext, EventAction  # Import event-related classes
 

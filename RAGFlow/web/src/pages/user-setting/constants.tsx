@@ -1,21 +1,19 @@
-import {
-  ApiIcon,
-  LogOutIcon,
-  ModelProviderIcon,
-  PasswordIcon,
-  ProfileIcon,
-  TeamIcon,
-} from '@/assets/icon/Icon';
+import { ReactComponent as ApiIcon } from '@/assets/svg/api.svg';
+import { ReactComponent as LogoutIcon } from '@/assets/svg/logout.svg';
+import { ReactComponent as ModelIcon } from '@/assets/svg/model-providers.svg';
+import { ReactComponent as PasswordIcon } from '@/assets/svg/password.svg';
+import { ReactComponent as ProfileIcon } from '@/assets/svg/profile.svg';
+import { ReactComponent as TeamIcon } from '@/assets/svg/team.svg';
 import { UserSettingRouteKey } from '@/constants/setting';
 import { MonitorOutlined } from '@ant-design/icons';
 
 export const UserSettingIconMap = {
   [UserSettingRouteKey.Profile]: <ProfileIcon />,
   [UserSettingRouteKey.Password]: <PasswordIcon />,
-  [UserSettingRouteKey.Model]: <ModelProviderIcon />,
+  [UserSettingRouteKey.Model]: <ModelIcon />,
   [UserSettingRouteKey.System]: <MonitorOutlined style={{ fontSize: 24 }} />,
   [UserSettingRouteKey.Team]: <TeamIcon />,
-  [UserSettingRouteKey.Logout]: <LogOutIcon />,
+  [UserSettingRouteKey.Logout]: <LogoutIcon />,
   [UserSettingRouteKey.Api]: <ApiIcon />,
 };
 

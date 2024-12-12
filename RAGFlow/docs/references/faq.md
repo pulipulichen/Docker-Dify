@@ -42,10 +42,10 @@ We officially support x86 CPU and nvidia GPU. While we also test RAGFlow on ARM6
 
 ### Which embedding models can be deployed locally?
 
-RAGFlow offers two Docker image editions, `v0.14.1-slim` and `v0.14.1`:  
+RAGFlow offers two Docker image editions, `dev-slim` and `dev`:  
   
-- `infiniflow/ragflow:v0.14.1-slim` (default): The RAGFlow Docker image without embedding models.  
-- `infiniflow/ragflow:v0.14.1`: The RAGFlow Docker image with embedding models including:
+- `infiniflow/ragflow:dev-slim` (default): The RAGFlow Docker image without embedding models.  
+- `infiniflow/ragflow:dev`: The RAGFlow Docker image with embedding models including:
   - Built-in embedding models:
     - `BAAI/bge-large-zh-v1.5`
     - `BAAI/bge-reranker-v2-m3`
@@ -331,13 +331,14 @@ Ensure that you update the **MAX_CONTENT_LENGTH** environment variable:
 1. In **ragflow/docker/.env**, uncomment environment variable `MAX_CONTENT_LENGTH`:
 
    ```
-   MAX_CONTENT_LENGTH=176160768 # 168MB
+   MAX_CONTENT_LENGTH=128000000
    ```
 
-2. Update **ragflow/docker/nginx/nginx.conf**:
+2. Update **docker-compose.yml**:
 
    ```
-   client_max_body_size 168M
+   environment:
+     - MAX_CONTENT_LENGTH=${MAX_CONTENT_LENGTH}
    ```
 
 3. Restart the RAGFlow server:

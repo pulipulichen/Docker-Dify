@@ -22,7 +22,7 @@ from abc import ABC
 from openai import OpenAI
 import openai
 from ollama import Client
-from rag.nlp import is_chinese, is_english
+from rag.nlp import is_english
 from rag.utils import num_tokens_from_string
 from groq import Groq
 import os
@@ -30,8 +30,6 @@ import json
 import requests
 import asyncio
 
-LENGTH_NOTIFICATION_CN = "······\n由于长度的原因，回答被截断了，要继续吗？"
-LENGTH_NOTIFICATION_EN = "...\nFor the content length reason, it stopped, continue?"
 
 class Base(ABC):
     def __init__(self, key, model_name, base_url):
@@ -49,10 +47,8 @@ class Base(ABC):
                 **gen_conf)
             ans = response.choices[0].message.content.strip()
             if response.choices[0].finish_reason == "length":
-                if is_chinese(ans):
-                    ans += LENGTH_NOTIFICATION_CN
-                else:
-                    ans += LENGTH_NOTIFICATION_EN
+                ans += "...\nFor the content length reason, it stopped, continue?" if is_english(
+                    [ans]) else "······\n由于长度的原因，回答被截断了，要继续吗？"
             return ans, response.usage.total_tokens
         except openai.APIError as e:
             return "**ERROR**: " + str(e), 0
@@ -69,8 +65,7 @@ class Base(ABC):
                 stream=True,
                 **gen_conf)
             for resp in response:
-                if not resp.choices:
-                    continue
+                if not resp.choices: continue
                 if not resp.choices[0].delta.content:
                     resp.choices[0].delta.content = ""
                 ans += resp.choices[0].delta.content
@@ -82,14 +77,11 @@ class Base(ABC):
                         )
                 elif isinstance(resp.usage, dict):
                     total_tokens = resp.usage.get("total_tokens", total_tokens)
-                else:
-                    total_tokens = resp.usage.total_tokens
+                else: total_tokens = resp.usage.total_tokens
 
                 if resp.choices[0].finish_reason == "length":
-                    if is_chinese(ans):
-                        ans += LENGTH_NOTIFICATION_CN
-                    else:
-                        ans += LENGTH_NOTIFICATION_EN
+                    ans += "...\nFor the content length reason, it stopped, continue?" if is_english(
+                        [ans]) else "······\n由于长度的原因，回答被截断了，要继续吗？"
                 yield ans
 
         except openai.APIError as e:
@@ -100,15 +92,13 @@ class Base(ABC):
 
 class GptTurbo(Base):
     def __init__(self, key, model_name="gpt-3.5-turbo", base_url="https://api.openai.com/v1"):
-        if not base_url:
-            base_url = "https://api.openai.com/v1"
+        if not base_url: base_url = "https://api.openai.com/v1"
         super().__init__(key, model_name, base_url)
 
 
 class MoonshotChat(Base):
     def __init__(self, key, model_name="moonshot-v1-8k", base_url="https://api.moonshot.cn/v1"):
-        if not base_url:
-            base_url = "https://api.moonshot.cn/v1"
+        if not base_url: base_url = "https://api.moonshot.cn/v1"
         super().__init__(key, model_name, base_url)
 
 
@@ -127,13 +117,12 @@ class HuggingFaceChat(Base):
             raise ValueError("Local llm url cannot be None")
         if base_url.split("/")[-1] != "v1":
             base_url = os.path.join(base_url, "v1")
-        super().__init__(key, model_name.split("___")[0], base_url)
+        super().__init__(key, model_name, base_url)
 
 
 class DeepSeekChat(Base):
     def __init__(self, key, model_name="deepseek-chat", base_url="https://api.deepseek.com/v1"):
-        if not base_url:
-            base_url = "https://api.deepseek.com/v1"
+        if not base_url: base_url = "https://api.deepseek.com/v1"
         super().__init__(key, model_name, base_url)
 
 
@@ -178,10 +167,8 @@ class BaiChuanChat(Base):
                 **self._format_params(gen_conf))
             ans = response.choices[0].message.content.strip()
             if response.choices[0].finish_reason == "length":
-                if is_chinese([ans]):
-                    ans += LENGTH_NOTIFICATION_CN
-                else:
-                    ans += LENGTH_NOTIFICATION_EN
+                ans += "...\nFor the content length reason, it stopped, continue?" if is_english(
+                    [ans]) else "······\n由于长度的原因，回答被截断了，要继续吗？"
             return ans, response.usage.total_tokens
         except openai.APIError as e:
             return "**ERROR**: " + str(e), 0
@@ -207,8 +194,7 @@ class BaiChuanChat(Base):
                 stream=True,
                 **self._format_params(gen_conf))
             for resp in response:
-                if not resp.choices:
-                    continue
+                if not resp.choices: continue
                 if not resp.choices[0].delta.content:
                     resp.choices[0].delta.content = ""
                 ans += resp.choices[0].delta.content
@@ -221,10 +207,8 @@ class BaiChuanChat(Base):
                     else resp.usage["total_tokens"]
                 )
                 if resp.choices[0].finish_reason == "length":
-                    if is_chinese([ans]):
-                        ans += LENGTH_NOTIFICATION_CN
-                    else:
-                        ans += LENGTH_NOTIFICATION_EN
+                    ans += "...\nFor the content length reason, it stopped, continue?" if is_english(
+                        [ans]) else "······\n由于长度的原因，回答被截断了，要继续吗？"
                 yield ans
 
         except Exception as e:
@@ -258,10 +242,8 @@ class QWenChat(Base):
                 ans += response.output.choices[0]['message']['content']
                 tk_count += response.usage.total_tokens
                 if response.output.choices[0].get("finish_reason", "") == "length":
-                    if is_chinese([ans]):
-                        ans += LENGTH_NOTIFICATION_CN
-                    else:
-                        ans += LENGTH_NOTIFICATION_EN
+                    ans += "...\nFor the content length reason, it stopped, continue?" if is_english(
+                        [ans]) else "······\n由于长度的原因，回答被截断了，要继续吗？"
                 return ans, tk_count
 
             return "**ERROR**: " + response.message, tk_count
@@ -294,10 +276,8 @@ class QWenChat(Base):
                     ans = resp.output.choices[0]['message']['content']
                     tk_count = resp.usage.total_tokens
                     if resp.output.choices[0].get("finish_reason", "") == "length":
-                        if is_chinese(ans):
-                            ans += LENGTH_NOTIFICATION_CN
-                        else:
-                            ans += LENGTH_NOTIFICATION_EN
+                        ans += "...\nFor the content length reason, it stopped, continue?" if is_english(
+                            [ans]) else "······\n由于长度的原因，回答被截断了，要继续吗？"
                     yield ans
                 else:
                     yield ans + "\n**ERROR**: " + resp.message if not re.search(r" (key|quota)", str(resp.message).lower()) else "Out of credit. Please set the API key in **settings > Model providers.**"
@@ -319,10 +299,8 @@ class ZhipuChat(Base):
         if system:
             history.insert(0, {"role": "system", "content": system})
         try:
-            if "presence_penalty" in gen_conf:
-                del gen_conf["presence_penalty"]
-            if "frequency_penalty" in gen_conf:
-                del gen_conf["frequency_penalty"]
+            if "presence_penalty" in gen_conf: del gen_conf["presence_penalty"]
+            if "frequency_penalty" in gen_conf: del gen_conf["frequency_penalty"]
             response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=history,
@@ -330,10 +308,8 @@ class ZhipuChat(Base):
             )
             ans = response.choices[0].message.content.strip()
             if response.choices[0].finish_reason == "length":
-                if is_chinese(ans):
-                    ans += LENGTH_NOTIFICATION_CN
-                else:
-                    ans += LENGTH_NOTIFICATION_EN
+                ans += "...\nFor the content length reason, it stopped, continue?" if is_english(
+                    [ans]) else "······\n由于长度的原因，回答被截断了，要继续吗？"
             return ans, response.usage.total_tokens
         except Exception as e:
             return "**ERROR**: " + str(e), 0
@@ -341,10 +317,8 @@ class ZhipuChat(Base):
     def chat_streamly(self, system, history, gen_conf):
         if system:
             history.insert(0, {"role": "system", "content": system})
-        if "presence_penalty" in gen_conf:
-            del gen_conf["presence_penalty"]
-        if "frequency_penalty" in gen_conf:
-            del gen_conf["frequency_penalty"]
+        if "presence_penalty" in gen_conf: del gen_conf["presence_penalty"]
+        if "frequency_penalty" in gen_conf: del gen_conf["frequency_penalty"]
         ans = ""
         tk_count = 0
         try:
@@ -355,18 +329,14 @@ class ZhipuChat(Base):
                 **gen_conf
             )
             for resp in response:
-                if not resp.choices[0].delta.content:
-                    continue
+                if not resp.choices[0].delta.content: continue
                 delta = resp.choices[0].delta.content
                 ans += delta
                 if resp.choices[0].finish_reason == "length":
-                    if is_chinese(ans):
-                        ans += LENGTH_NOTIFICATION_CN
-                    else:
-                        ans += LENGTH_NOTIFICATION_EN
+                    ans += "...\nFor the content length reason, it stopped, continue?" if is_english(
+                        [ans]) else "······\n由于长度的原因，回答被截断了，要继续吗？"
                     tk_count = resp.usage.total_tokens
-                if resp.choices[0].finish_reason == "stop":
-                    tk_count = resp.usage.total_tokens
+                if resp.choices[0].finish_reason == "stop": tk_count = resp.usage.total_tokens
                 yield ans
         except Exception as e:
             yield ans + "\n**ERROR**: " + str(e)
@@ -384,16 +354,11 @@ class OllamaChat(Base):
             history.insert(0, {"role": "system", "content": system})
         try:
             options = {}
-            if "temperature" in gen_conf:
-                options["temperature"] = gen_conf["temperature"]
-            if "max_tokens" in gen_conf:
-                options["num_predict"] = gen_conf["max_tokens"]
-            if "top_p" in gen_conf:
-                options["top_p"] = gen_conf["top_p"]
-            if "presence_penalty" in gen_conf:
-                options["presence_penalty"] = gen_conf["presence_penalty"]
-            if "frequency_penalty" in gen_conf:
-                options["frequency_penalty"] = gen_conf["frequency_penalty"]
+            if "temperature" in gen_conf: options["temperature"] = gen_conf["temperature"]
+            if "max_tokens" in gen_conf: options["num_predict"] = gen_conf["max_tokens"]
+            if "top_p" in gen_conf: options["top_k"] = gen_conf["top_p"]
+            if "presence_penalty" in gen_conf: options["presence_penalty"] = gen_conf["presence_penalty"]
+            if "frequency_penalty" in gen_conf: options["frequency_penalty"] = gen_conf["frequency_penalty"]
             response = self.client.chat(
                 model=self.model_name,
                 messages=history,
@@ -409,16 +374,11 @@ class OllamaChat(Base):
         if system:
             history.insert(0, {"role": "system", "content": system})
         options = {}
-        if "temperature" in gen_conf:
-            options["temperature"] = gen_conf["temperature"]
-        if "max_tokens" in gen_conf:
-            options["num_predict"] = gen_conf["max_tokens"]
-        if "top_p" in gen_conf:
-            options["top_p"] = gen_conf["top_p"]
-        if "presence_penalty" in gen_conf:
-            options["presence_penalty"] = gen_conf["presence_penalty"]
-        if "frequency_penalty" in gen_conf:
-            options["frequency_penalty"] = gen_conf["frequency_penalty"]
+        if "temperature" in gen_conf: options["temperature"] = gen_conf["temperature"]
+        if "max_tokens" in gen_conf: options["num_predict"] = gen_conf["max_tokens"]
+        if "top_p" in gen_conf: options["top_k"] = gen_conf["top_p"]
+        if "presence_penalty" in gen_conf: options["presence_penalty"] = gen_conf["presence_penalty"]
+        if "frequency_penalty" in gen_conf: options["frequency_penalty"] = gen_conf["frequency_penalty"]
         ans = ""
         try:
             response = self.client.chat(
@@ -470,7 +430,7 @@ class LocalLLM(Base):
                     try:
                         self._connection.send(pickle.dumps((name, args, kwargs)))
                         return pickle.loads(self._connection.recv())
-                    except Exception:
+                    except Exception as e:
                         self.__conn()
                 raise Exception("RPC connection lost!")
 
@@ -482,7 +442,7 @@ class LocalLLM(Base):
         self.client = Client(port=12345, protocol="grpc", asyncio=True)
 
     def _prepare_prompt(self, system, history, gen_conf):
-        from rag.svr.jina_server import Prompt
+        from rag.svr.jina_server import Prompt, Generation
         if system:
             history.insert(0, {"role": "system", "content": system})
         if "max_tokens" in gen_conf:
@@ -490,7 +450,7 @@ class LocalLLM(Base):
         return Prompt(message=history, gen_conf=gen_conf)
 
     def _stream_response(self, endpoint, prompt):
-        from rag.svr.jina_server import Generation
+        from rag.svr.jina_server import Prompt, Generation
         answer = ""
         try:
             res = self.client.stream_doc(
@@ -565,10 +525,8 @@ class MiniMaxChat(Base):
             response = response.json()
             ans = response["choices"][0]["message"]["content"].strip()
             if response["choices"][0]["finish_reason"] == "length":
-                if is_chinese(ans):
-                    ans += LENGTH_NOTIFICATION_CN
-                else:
-                    ans += LENGTH_NOTIFICATION_EN
+                ans += "...\nFor the content length reason, it stopped, continue?" if is_english(
+                    [ans]) else "······\n由于长度的原因，回答被截断了，要继续吗？"
             return ans, response["usage"]["total_tokens"]
         except Exception as e:
             return "**ERROR**: " + str(e), 0
@@ -636,10 +594,8 @@ class MistralChat(Base):
                 **gen_conf)
             ans = response.choices[0].message.content
             if response.choices[0].finish_reason == "length":
-                if is_chinese(ans):
-                    ans += LENGTH_NOTIFICATION_CN
-                else:
-                    ans += LENGTH_NOTIFICATION_EN
+                ans += "...\nFor the content length reason, it stopped, continue?" if is_english(
+                    [ans]) else "······\n由于长度的原因，回答被截断了，要继续吗？"
             return ans, response.usage.total_tokens
         except openai.APIError as e:
             return "**ERROR**: " + str(e), 0
@@ -658,15 +614,12 @@ class MistralChat(Base):
                 messages=history,
                 **gen_conf)
             for resp in response:
-                if not resp.choices or not resp.choices[0].delta.content:
-                    continue
+                if not resp.choices or not resp.choices[0].delta.content: continue
                 ans += resp.choices[0].delta.content
                 total_tokens += 1
                 if resp.choices[0].finish_reason == "length":
-                    if is_chinese(ans):
-                        ans += LENGTH_NOTIFICATION_CN
-                    else:
-                        ans += LENGTH_NOTIFICATION_EN
+                    ans += "...\nFor the content length reason, it stopped, continue?" if is_english(
+                        [ans]) else "······\n由于长度的原因，回答被截断了，要继续吗？"
                 yield ans
 
         except openai.APIError as e:
@@ -858,10 +811,8 @@ class GroqChat:
             )
             ans = response.choices[0].message.content
             if response.choices[0].finish_reason == "length":
-                if is_chinese(ans):
-                    ans += LENGTH_NOTIFICATION_CN
-                else:
-                    ans += LENGTH_NOTIFICATION_EN
+                ans += "...\nFor the content length reason, it stopped, continue?" if is_english(
+                    [ans]) else "······\n由于长度的原因，回答被截断了，要继续吗？"
             return ans, response.usage.total_tokens
         except Exception as e:
             return ans + "\n**ERROR**: " + str(e), 0
@@ -887,10 +838,8 @@ class GroqChat:
                 ans += resp.choices[0].delta.content
                 total_tokens += 1
                 if resp.choices[0].finish_reason == "length":
-                    if is_chinese(ans):
-                        ans += LENGTH_NOTIFICATION_CN
-                    else:
-                        ans += LENGTH_NOTIFICATION_EN
+                    ans += "...\nFor the content length reason, it stopped, continue?" if is_english(
+                        [ans]) else "······\n由于长度的原因，回答被截断了，要继续吗？"
                 yield ans
 
         except Exception as e:
@@ -1219,8 +1168,7 @@ class SparkChat(Base):
         assert model_name in model2version or model_name in version2model, f"The given model name is not supported yet. Support: {list(model2version.keys())}"
         if model_name in model2version:
             model_version = model2version[model_name]
-        else:
-            model_version = model_name
+        else: model_version = model_name
         super().__init__(key, model_version, base_url)
 
 
@@ -1305,10 +1253,8 @@ class AnthropicChat(Base):
             self.system = system
         if "max_tokens" not in gen_conf:
             gen_conf["max_tokens"] = 4096
-        if "presence_penalty" in gen_conf:
-            del gen_conf["presence_penalty"]
-        if "frequency_penalty" in gen_conf:
-            del gen_conf["frequency_penalty"]
+        if "presence_penalty" in gen_conf: del gen_conf["presence_penalty"]
+        if "frequency_penalty" in gen_conf: del gen_conf["frequency_penalty"]
 
         ans = ""
         try:
@@ -1338,10 +1284,8 @@ class AnthropicChat(Base):
             self.system = system
         if "max_tokens" not in gen_conf:
             gen_conf["max_tokens"] = 4096
-        if "presence_penalty" in gen_conf:
-            del gen_conf["presence_penalty"]
-        if "frequency_penalty" in gen_conf:
-            del gen_conf["frequency_penalty"]
+        if "presence_penalty" in gen_conf: del gen_conf["presence_penalty"]
+        if "frequency_penalty" in gen_conf: del gen_conf["frequency_penalty"]
 
         ans = ""
         total_tokens = 0

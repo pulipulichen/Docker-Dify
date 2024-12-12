@@ -1,5 +1,3 @@
-import { FileMimeType } from '@/constants/common';
-import fileManagerService from '@/services/file-manager-service';
 import { UploadFile } from 'antd';
 
 export const transformFile2Base64 = (val: any): Promise<any> => {
@@ -7,41 +5,7 @@ export const transformFile2Base64 = (val: any): Promise<any> => {
     const reader = new FileReader();
     reader.readAsDataURL(val);
     reader.onload = (): void => {
-      // Create image object
-      const img = new Image();
-      img.src = reader.result as string;
-
-      img.onload = () => {
-        // Create canvas
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-
-        // Calculate compressed dimensions, set max width/height to 800px
-        let width = img.width;
-        let height = img.height;
-        const maxSize = 100;
-
-        if (width > height && width > maxSize) {
-          height = (height * maxSize) / width;
-          width = maxSize;
-        } else if (height > maxSize) {
-          width = (width * maxSize) / height;
-          height = maxSize;
-        }
-
-        // Set canvas dimensions
-        canvas.width = width;
-        canvas.height = height;
-
-        // Draw image
-        ctx?.drawImage(img, 0, 0, width, height);
-
-        // Convert to base64, maintain original format and transparency
-        const compressedBase64 = canvas.toDataURL('image/png');
-        resolve(compressedBase64);
-      };
-
-      img.onerror = reject;
+      resolve(reader.result);
     };
     reader.onerror = reject;
   });
@@ -51,7 +15,6 @@ export const transformBase64ToFile = (
   dataUrl: string,
   filename: string = 'file',
 ) => {
-  console.log('transformBase64ToFile', dataUrl);
   let arr = dataUrl.split(','),
     bstr = atob(arr[1]),
     n = bstr.length,
@@ -67,7 +30,6 @@ export const transformBase64ToFile = (
 };
 
 export const normFile = (e: any) => {
-  console.log('normFile', e);
   if (Array.isArray(e)) {
     return e;
   }
@@ -75,7 +37,6 @@ export const normFile = (e: any) => {
 };
 
 export const getUploadFileListFromBase64 = (avatar: string) => {
-  console.log('getUploadFileListFromBase64', avatar);
   let fileList: UploadFile[] = [];
 
   if (avatar) {
@@ -86,7 +47,6 @@ export const getUploadFileListFromBase64 = (avatar: string) => {
 };
 
 export const getBase64FromUploadFileList = async (fileList?: UploadFile[]) => {
-  console.log('getBase64FromUploadFileList', fileList);
   if (Array.isArray(fileList) && fileList.length > 0) {
     const file = fileList[0];
     const originFileObj = file.originFileObj;
@@ -102,33 +62,33 @@ export const getBase64FromUploadFileList = async (fileList?: UploadFile[]) => {
   return '';
 };
 
-export const downloadFileFromBlob = (blob: Blob, name?: string) => {
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  if (name) {
-    a.download = name;
-  }
-  a.click();
-  window.URL.revokeObjectURL(url);
-};
-
-export const downloadDocument = async ({
-  id,
+export const downloadFile = ({
+  url,
   filename,
+  target,
 }: {
-  id: string;
+  url: string;
   filename?: string;
+  target?: string;
 }) => {
-  const response = await fileManagerService.getDocumentFile({}, id);
-  const blob = new Blob([response.data], { type: response.data.type });
-  downloadFileFromBlob(blob, filename);
+  const downloadElement = document.createElement('a');
+  downloadElement.style.display = 'none';
+  downloadElement.href = url;
+  if (target) {
+    downloadElement.target = '_blank';
+  }
+  downloadElement.rel = 'noopener noreferrer';
+  if (filename) {
+    downloadElement.download = filename;
+  }
+  document.body.appendChild(downloadElement);
+  downloadElement.click();
+  document.body.removeChild(downloadElement);
 };
 
 const Units = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
 
 export const formatBytes = (x: string | number) => {
-  console.log('formatBytes', x);
   let l = 0,
     n = (typeof x === 'string' ? parseInt(x, 10) : x) || 0;
 
@@ -137,12 +97,4 @@ export const formatBytes = (x: string | number) => {
   }
 
   return n.toFixed(n < 10 && l > 0 ? 1 : 0) + ' ' + Units[l];
-};
-
-export const downloadJsonFile = async (
-  data: Record<string, any>,
-  fileName: string,
-) => {
-  const blob = new Blob([JSON.stringify(data)], { type: FileMimeType.Json });
-  downloadFileFromBlob(blob, fileName);
 };

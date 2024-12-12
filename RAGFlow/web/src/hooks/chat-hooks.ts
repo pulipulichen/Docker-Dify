@@ -504,17 +504,11 @@ export const useCreateNextSharedConversation = () => {
   return { data, loading, createSharedConversation: mutateAsync };
 };
 
-// deprecated
-export const useFetchNextSharedConversation = (
-  conversationId?: string | null,
-) => {
+export const useFetchNextSharedConversation = (conversationId: string) => {
   const { data, isPending: loading } = useQuery({
     queryKey: ['fetchSharedConversation'],
     enabled: !!conversationId,
     queryFn: async () => {
-      if (!conversationId) {
-        return {};
-      }
       const { data } = await chatService.getExternalConversation(
         null,
         conversationId,

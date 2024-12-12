@@ -17,14 +17,12 @@ import json
 import re
 import traceback
 from copy import deepcopy
-
-from api.db.services.conversation_service import ConversationService, structure_answer
 from api.db.services.user_service import UserTenantService
 from flask import request, Response
 from flask_login import login_required, current_user
 
 from api.db import LLMType
-from api.db.services.dialog_service import DialogService, chat, ask
+from api.db.services.dialog_service import DialogService, ConversationService, chat, ask
 from api.db.services.knowledgebase_service import KnowledgebaseService
 from api.db.services.llm_service import LLMBundle, TenantService, TenantLLMService
 from api import settings
@@ -33,7 +31,7 @@ from api.utils.api_utils import server_error_response, get_data_error_result, va
 from graphrag.mind_map_extractor import MindMapExtractor
 
 
-@manager.route('/set', methods=['POST'])  # noqa: F821
+@manager.route('/set', methods=['POST'])
 @login_required
 def set_conversation():
     req = request.json
@@ -74,7 +72,7 @@ def set_conversation():
         return server_error_response(e)
 
 
-@manager.route('/get', methods=['GET'])  # noqa: F821
+@manager.route('/get', methods=['GET'])
 @login_required
 def get():
     conv_id = request.args["conversation_id"]
@@ -90,30 +88,13 @@ def get():
             return get_json_result(
                 data=False, message='Only owner of conversation authorized for this operation.',
                 code=settings.RetCode.OPERATING_ERROR)
-
-        def get_value(d, k1, k2):
-            return d.get(k1, d.get(k2))
-
-        for ref in conv.reference:
-            if isinstance(ref, list):
-                continue
-            ref["chunks"] = [{
-                "id": get_value(ck, "chunk_id", "id"),
-                "content": get_value(ck, "content", "content_with_weight"),
-                "document_id": get_value(ck, "doc_id", "document_id"),
-                "document_name": get_value(ck, "docnm_kwd", "document_name"),
-                "dataset_id": get_value(ck, "kb_id", "dataset_id"),
-                "image_id": get_value(ck, "image_id", "img_id"),
-                "positions": get_value(ck, "positions", "position_int"),
-            } for ck in ref.get("chunks", [])]
-
         conv = conv.to_dict()
         return get_json_result(data=conv)
     except Exception as e:
         return server_error_response(e)
 
 
-@manager.route('/rm', methods=['POST'])  # noqa: F821
+@manager.route('/rm', methods=['POST'])
 @login_required
 def rm():
     conv_ids = request.json["conversation_ids"]
@@ -136,7 +117,7 @@ def rm():
         return server_error_response(e)
 
 
-@manager.route('/list', methods=['GET'])  # noqa: F821
+@manager.route('/list', methods=['GET'])
 @login_required
 def list_convsersation():
     dialog_id = request.args["dialog_id"]
@@ -149,14 +130,13 @@ def list_convsersation():
             dialog_id=dialog_id,
             order_by=ConversationService.model.create_time,
             reverse=True)
-
         convs = [d.to_dict() for d in convs]
         return get_json_result(data=convs)
     except Exception as e:
         return server_error_response(e)
 
 
-@manager.route('/completion', methods=['POST'])  # noqa: F821
+@manager.route('/completion', methods=['POST'])
 @login_required
 @validate_request("conversation_id", "messages")
 def completion():
@@ -182,31 +162,24 @@ def completion():
 
         if not conv.reference:
             conv.reference = []
-        else:
-            def get_value(d, k1, k2):
-                return d.get(k1, d.get(k2))
-
-            for ref in conv.reference:
-                if isinstance(ref, list):
-                    continue
-                ref["chunks"] = [{
-                    "id": get_value(ck, "chunk_id", "id"),
-                    "content": get_value(ck, "content", "content_with_weight"),
-                    "document_id": get_value(ck, "doc_id", "document_id"),
-                    "document_name": get_value(ck, "docnm_kwd", "document_name"),
-                    "dataset_id": get_value(ck, "kb_id", "dataset_id"),
-                    "image_id": get_value(ck, "image_id", "img_id"),
-                    "positions": get_value(ck, "positions", "position_int"),
-                } for ck in ref.get("chunks", [])]
-
-        if not conv.reference:
-            conv.reference = []
+        conv.message.append({"role": "assistant", "content": "", "id": message_id})
         conv.reference.append({"chunks": [], "doc_aggs": []})
+
+        def fillin_conv(ans):
+            nonlocal conv, message_id
+            if not conv.reference:
+                conv.reference.append(ans["reference"])
+            else:
+                conv.reference[-1] = ans["reference"]
+            conv.message[-1] = {"role": "assistant", "content": ans["answer"],
+                                "id": message_id, "prompt": ans.get("prompt", "")}
+            ans["id"] = message_id
+
         def stream():
             nonlocal dia, msg, req, conv
             try:
                 for ans in chat(dia, msg, True, **req):
-                    ans = structure_answer(conv, ans, message_id, conv.id)
+                    fillin_conv(ans)
                     yield "data:" + json.dumps({"code": 0, "message": "", "data": ans}, ensure_ascii=False) + "\n\n"
                 ConversationService.update_by_id(conv.id, conv.to_dict())
             except Exception as e:
@@ -227,7 +200,8 @@ def completion():
         else:
             answer = None
             for ans in chat(dia, msg, **req):
-                answer = structure_answer(conv, ans, message_id, req["conversation_id"])
+                answer = ans
+                fillin_conv(ans)
                 ConversationService.update_by_id(conv.id, conv.to_dict())
                 break
             return get_json_result(data=answer)
@@ -235,7 +209,7 @@ def completion():
         return server_error_response(e)
 
 
-@manager.route('/tts', methods=['POST'])  # noqa: F821
+@manager.route('/tts', methods=['POST'])
 @login_required
 def tts():
     req = request.json
@@ -269,7 +243,7 @@ def tts():
     return resp
 
 
-@manager.route('/delete_msg', methods=['POST'])  # noqa: F821
+@manager.route('/delete_msg', methods=['POST'])
 @login_required
 @validate_request("conversation_id", "message_id")
 def delete_msg():
@@ -292,7 +266,7 @@ def delete_msg():
     return get_json_result(data=conv)
 
 
-@manager.route('/thumbup', methods=['POST'])  # noqa: F821
+@manager.route('/thumbup', methods=['POST'])
 @login_required
 @validate_request("conversation_id", "message_id")
 def thumbup():
@@ -307,19 +281,17 @@ def thumbup():
         if req["message_id"] == msg.get("id", "") and msg.get("role", "") == "assistant":
             if up_down:
                 msg["thumbup"] = True
-                if "feedback" in msg:
-                    del msg["feedback"]
+                if "feedback" in msg: del msg["feedback"]
             else:
                 msg["thumbup"] = False
-                if feedback:
-                    msg["feedback"] = feedback
+                if feedback: msg["feedback"] = feedback
             break
 
     ConversationService.update_by_id(conv["id"], conv)
     return get_json_result(data=conv)
 
 
-@manager.route('/ask', methods=['POST'])  # noqa: F821
+@manager.route('/ask', methods=['POST'])
 @login_required
 @validate_request("question", "kb_ids")
 def ask_about():
@@ -345,7 +317,7 @@ def ask_about():
     return resp
 
 
-@manager.route('/mindmap', methods=['POST'])  # noqa: F821
+@manager.route('/mindmap', methods=['POST'])
 @login_required
 @validate_request("question", "kb_ids")
 def mindmap():
@@ -367,7 +339,7 @@ def mindmap():
     return get_json_result(data=mind_map)
 
 
-@manager.route('/related_questions', methods=['POST'])  # noqa: F821
+@manager.route('/related_questions', methods=['POST'])
 @login_required
 @validate_request("question")
 def related_questions():

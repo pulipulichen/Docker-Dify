@@ -1,12 +1,10 @@
 import { Images, SupportedPreviewDocumentTypes } from '@/constants/common';
-import { IReferenceChunk } from '@/interfaces/database/chat';
 import { IChunk } from '@/interfaces/database/knowledge';
 import { UploadFile } from 'antd';
-import { get } from 'lodash';
 import { v4 as uuid } from 'uuid';
 
 export const buildChunkHighlights = (
-  selectedChunk: IChunk | IReferenceChunk,
+  selectedChunk: IChunk,
   size: { width: number; height: number },
 ) => {
   return Array.isArray(selectedChunk?.positions) &&
@@ -26,11 +24,7 @@ export const buildChunkHighlights = (
             text: '',
             emoji: '',
           },
-          content: {
-            text:
-              get(selectedChunk, 'content_with_weight') ||
-              get(selectedChunk, 'content', ''),
-          },
+          content: { text: selectedChunk.content_with_weight },
           position: {
             boundingRect: boundingRect,
             rects: [boundingRect],

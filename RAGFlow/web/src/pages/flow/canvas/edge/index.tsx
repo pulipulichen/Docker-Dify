@@ -6,7 +6,6 @@ import {
 } from 'reactflow';
 import useGraphStore from '../../store';
 
-import { useTheme } from '@/components/theme-provider';
 import { useFetchFlow } from '@/hooks/flow-hooks';
 import { useMemo } from 'react';
 import styles from './index.less';
@@ -34,7 +33,7 @@ export function ButtonEdge({
     targetY,
     targetPosition,
   });
-  const { theme } = useTheme();
+
   const selectedStyle = useMemo(() => {
     return selected ? { strokeWidth: 2, stroke: '#1677ff' } : {};
   }, [selected]);
@@ -94,9 +93,7 @@ export function ButtonEdge({
           className="nodrag nopan"
         >
           <button
-            className={
-              theme === 'dark' ? styles.edgeButtonDark : styles.edgeButton
-            }
+            className={styles.edgeButton}
             type="button"
             onClick={onEdgeClick}
           >

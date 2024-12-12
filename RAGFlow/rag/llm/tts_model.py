@@ -16,6 +16,7 @@
 
 import _thread as thread
 import base64
+import datetime
 import hashlib
 import hmac
 import json
@@ -174,8 +175,7 @@ class QwenTTS(Base):
 
 class OpenAITTS(Base):
     def __init__(self, key, model_name="tts-1", base_url="https://api.openai.com/v1"):
-        if not base_url:
-            base_url = "https://api.openai.com/v1"
+        if not base_url: base_url = "https://api.openai.com/v1"
         self.api_key = key
         self.model_name = model_name
         self.base_url = base_url

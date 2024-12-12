@@ -21,7 +21,7 @@ from api.db.services.document_service import DocumentService
 from api.db.services.file2document_service import File2DocumentService
 from api.db.services.file_service import FileService
 from api.db.services.user_service import TenantService, UserTenantService
-from api.utils.api_utils import server_error_response, get_data_error_result, validate_request, not_allowed_parameters
+from api.utils.api_utils import server_error_response, get_data_error_result, validate_request
 from api.utils import get_uuid
 from api.db import StatusEnum, FileSource
 from api.db.services.knowledgebase_service import KnowledgebaseService
@@ -32,7 +32,7 @@ from rag.nlp import search
 from api.constants import DATASET_NAME_LIMIT
 
 
-@manager.route('/create', methods=['post'])  # noqa: F821
+@manager.route('/create', methods=['post'])
 @login_required
 @validate_request("name")
 def create():
@@ -67,10 +67,9 @@ def create():
         return server_error_response(e)
 
 
-@manager.route('/update', methods=['post'])  # noqa: F821
+@manager.route('/update', methods=['post'])
 @login_required
 @validate_request("kb_id", "name", "description", "permission", "parser_id")
-@not_allowed_parameters("id", "tenant_id", "created_by", "create_time", "update_time", "create_date", "update_date", "created_by")
 def update():
     req = request.json
     req["name"] = req["name"].strip()
@@ -102,14 +101,6 @@ def update():
         if not KnowledgebaseService.update_by_id(kb.id, req):
             return get_data_error_result()
 
-        if kb.pagerank != req.get("pagerank", 0):
-            if req.get("pagerank", 0) > 0:
-                settings.docStoreConn.update({"kb_id": kb.id}, {"pagerank_fea": req["pagerank"]},
-                                         search.index_name(kb.tenant_id), kb.id)
-            else:
-                settings.docStoreConn.update({"exist": "pagerank_fea"}, {"remove": "pagerank_fea"},
-                                         search.index_name(kb.tenant_id), kb.id)
-
         e, kb = KnowledgebaseService.get_by_id(kb.id)
         if not e:
             return get_data_error_result(
@@ -120,7 +111,7 @@ def update():
         return server_error_response(e)
 
 
-@manager.route('/detail', methods=['GET'])  # noqa: F821
+@manager.route('/detail', methods=['GET'])
 @login_required
 def detail():
     kb_id = request.args["kb_id"]
@@ -143,7 +134,7 @@ def detail():
         return server_error_response(e)
 
 
-@manager.route('/list', methods=['GET'])  # noqa: F821
+@manager.route('/list', methods=['GET'])
 @login_required
 def list_kbs():
     keywords = request.args.get("keywords", "")
@@ -160,7 +151,7 @@ def list_kbs():
         return server_error_response(e)
 
 
-@manager.route('/rm', methods=['post'])  # noqa: F821
+@manager.route('/rm', methods=['post'])
 @login_required
 @validate_request("kb_id")
 def rm():

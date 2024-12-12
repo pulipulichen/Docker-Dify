@@ -25,7 +25,6 @@ const Delimiter = () => {
       label={t('knowledgeDetails.delimiter')}
       initialValue={`\\n!?;。；！？`}
       rules={[{ required: true }]}
-      tooltip={t('knowledgeDetails.delimiterTip')}
     >
       <DelimiterInput />
     </Form.Item>

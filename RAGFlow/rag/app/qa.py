@@ -73,7 +73,7 @@ class Pdf(PdfParser):
     def __call__(self, filename, binary=None, from_page=0,
                  to_page=100000, zoomin=3, callback=None):
         start = timer()
-        callback(msg="OCR started")
+        callback(msg="OCR is running...")
         self.__images__(
             filename if not binary else binary,
             zoomin,
@@ -81,19 +81,15 @@ class Pdf(PdfParser):
             to_page,
             callback
         )
-        callback(msg="OCR finished ({:.2f}s)".format(timer() - start))
-        logging.debug("OCR({}~{}): {:.2f}s".format(from_page, to_page, timer() - start))
+        callback(msg="OCR finished")
+        logging.debug("OCR({}~{}): {}".format(from_page, to_page, timer() - start))
         start = timer()
         self._layouts_rec(zoomin, drop=False)
-        callback(0.63, "Layout analysis ({:.2f}s)".format(timer() - start))
-
-        start = timer()
+        callback(0.63, "Layout analysis finished.")
         self._table_transformer_job(zoomin)
-        callback(0.65, "Table analysis ({:.2f}s)".format(timer() - start))
-
-        start = timer()
+        callback(0.65, "Table analysis finished.")
         self._text_merge()
-        callback(0.67, "Text merged ({:.2f}s)".format(timer() - start))
+        callback(0.67, "Text merging finished")
         tbls = self._extract_table_figure(True, zoomin, True, True)
         #self._naive_vertical_merge()
         # self._concat_downward()
@@ -171,7 +167,7 @@ class Pdf(PdfParser):
         tbl_bottom = tbls[tbl_index][1][0][4]
         tbl_tag = "@@{}\t{:.1f}\t{:.1f}\t{:.1f}\t{:.1f}##" \
             .format(tbl_pn, tbl_left, tbl_right, tbl_top, tbl_bottom)
-        _tbl_text = ''.join(tbls[tbl_index][0][1])
+        tbl_text = ''.join(tbls[tbl_index][0][1])
         return tbl_pn, tbl_left, tbl_right, tbl_top, tbl_bottom, tbl_tag,
 
 
@@ -230,7 +226,7 @@ class Docx(DocxParser):
             sum_question = '\n'.join(question_stack)
             if sum_question:
                 qai_list.append((sum_question, last_answer, last_image))
-
+                
         tbls = []
         for tb in self.doc.tables:
             html= "<table>"
@@ -325,11 +321,9 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         txt = get_text(filename, binary)
         lines = txt.split("\n")
         comma, tab = 0, 0
-        for line in lines:
-            if len(line.split(",")) == 2:
-                comma += 1
-            if len(line.split("\t")) == 2:
-                tab += 1
+        for l in lines:
+            if len(l.split(",")) == 2: comma += 1
+            if len(l.split("\t")) == 2: tab += 1
         delimiter = "\t" if tab >= comma else ","
 
         fails = []
@@ -338,21 +332,18 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         while i < len(lines):
             arr = lines[i].split(delimiter)
             if len(arr) != 2:
-                if question:
-                    answer += "\n" + lines[i]
+                if question: answer += "\n" + lines[i]
                 else:
                     fails.append(str(i+1))
             elif len(arr) == 2:
-                if question and answer:
-                    res.append(beAdoc(deepcopy(doc), question, answer, eng))
+                if question and answer: res.append(beAdoc(deepcopy(doc), question, answer, eng))
                 question, answer = arr
             i += 1
             if len(res) % 999 == 0:
                 callback(len(res) * 0.6 / len(lines), ("Extract Q&A: {}".format(len(res)) + (
                     f"{len(fails)} failure, line: %s..." % (",".join(fails[:3])) if fails else "")))
 
-        if question:
-            res.append(beAdoc(deepcopy(doc), question, answer, eng))
+        if question: res.append(beAdoc(deepcopy(doc), question, answer, eng))
 
         callback(0.6, ("Extract Q&A: {}".format(len(res)) + (
             f"{len(fails)} failure, line: %s..." % (",".join(fails[:3])) if fails else "")))
@@ -372,18 +363,19 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         callback(0.1, "Start to parse.")
         txt = get_text(filename, binary)
         lines = txt.split("\n")
-        _last_question, last_answer = "", ""
+        last_question, last_answer = "", ""
         question_stack, level_stack = [], []
         code_block = False
-        for index, line in enumerate(lines):
-            if line.strip().startswith('```'):
+        level_index = [-1] * 7
+        for index, l in enumerate(lines):
+            if l.strip().startswith('```'):
                 code_block = not code_block
             question_level, question = 0, ''
             if not code_block:
-                question_level, question = mdQuestionLevel(line)
+                question_level, question = mdQuestionLevel(l)
 
             if not question_level or question_level > 6: # not a question
-                last_answer = f'{last_answer}\n{line}'
+                last_answer = f'{last_answer}\n{l}'
             else:   # is a question
                 if last_answer.strip():
                     sum_question = '\n'.join(question_stack)

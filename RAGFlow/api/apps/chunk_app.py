@@ -31,11 +31,11 @@ from api.utils.api_utils import server_error_response, get_data_error_result, va
 from api.db.services.document_service import DocumentService
 from api import settings
 from api.utils.api_utils import get_json_result
-import xxhash
+import hashlib
 import re
 
 
-@manager.route('/list', methods=['POST'])  # noqa: F821
+@manager.route('/list', methods=['POST'])
 @login_required
 @validate_request("doc_id")
 def list_chunk():
@@ -68,10 +68,9 @@ def list_chunk():
                 "doc_id": sres.field[id]["doc_id"],
                 "docnm_kwd": sres.field[id]["docnm_kwd"],
                 "important_kwd": sres.field[id].get("important_kwd", []),
-                "question_kwd": sres.field[id].get("question_kwd", []),
                 "image_id": sres.field[id].get("img_id", ""),
-                "available_int": int(sres.field[id].get("available_int", 1)),
-                "positions": sres.field[id].get("position_int", []),
+                "available_int": sres.field[id].get("available_int", 1),
+                "positions": json.loads(sres.field[id].get("position_list", "[]")),
             }
             assert isinstance(d["positions"], list)
             assert len(d["positions"]) == 0 or (isinstance(d["positions"][0], list) and len(d["positions"][0]) == 5)
@@ -84,7 +83,7 @@ def list_chunk():
         return server_error_response(e)
 
 
-@manager.route('/get', methods=['GET'])  # noqa: F821
+@manager.route('/get', methods=['GET'])
 @login_required
 def get():
     chunk_id = request.args["chunk_id"]
@@ -113,10 +112,10 @@ def get():
         return server_error_response(e)
 
 
-@manager.route('/set', methods=['POST'])  # noqa: F821
+@manager.route('/set', methods=['POST'])
 @login_required
 @validate_request("doc_id", "chunk_id", "content_with_weight",
-                  "important_kwd", "question_kwd")
+                  "important_kwd")
 def set():
     req = request.json
     d = {
@@ -126,8 +125,6 @@ def set():
     d["content_sm_ltks"] = rag_tokenizer.fine_grained_tokenize(d["content_ltks"])
     d["important_kwd"] = req["important_kwd"]
     d["important_tks"] = rag_tokenizer.tokenize(" ".join(req["important_kwd"]))
-    d["question_kwd"] = req["question_kwd"]
-    d["question_tks"] = rag_tokenizer.tokenize("\n".join(req["question_kwd"]))
     if "available_int" in req:
         d["available_int"] = req["available_int"]
 
@@ -155,7 +152,7 @@ def set():
             d = beAdoc(d, arr[0], arr[1], not any(
                 [rag_tokenizer.is_chinese(t) for t in q + a]))
 
-        v, c = embd_mdl.encode([doc.name, req["content_with_weight"] if not d["question_kwd"] else "\n".join(d["question_kwd"])])
+        v, c = embd_mdl.encode([doc.name, req["content_with_weight"]])
         v = 0.1 * v[0] + 0.9 * v[1] if doc.parser_id != ParserType.QA else v[1]
         d["q_%d_vec" % len(v)] = v.tolist()
         settings.docStoreConn.update({"id": req["chunk_id"]}, d, search.index_name(tenant_id), doc.kb_id)
@@ -164,7 +161,7 @@ def set():
         return server_error_response(e)
 
 
-@manager.route('/switch', methods=['POST'])  # noqa: F821
+@manager.route('/switch', methods=['POST'])
 @login_required
 @validate_request("chunk_ids", "available_int", "doc_id")
 def switch():
@@ -184,7 +181,7 @@ def switch():
         return server_error_response(e)
 
 
-@manager.route('/rm', methods=['POST'])  # noqa: F821
+@manager.route('/rm', methods=['POST'])
 @login_required
 @validate_request("chunk_ids", "doc_id")
 def rm():
@@ -203,19 +200,19 @@ def rm():
         return server_error_response(e)
 
 
-@manager.route('/create', methods=['POST'])  # noqa: F821
+@manager.route('/create', methods=['POST'])
 @login_required
 @validate_request("doc_id", "content_with_weight")
 def create():
     req = request.json
-    chunck_id = xxhash.xxh64((req["content_with_weight"] + req["doc_id"]).encode("utf-8")).hexdigest()
+    md5 = hashlib.md5()
+    md5.update((req["content_with_weight"] + req["doc_id"]).encode("utf-8"))
+    chunck_id = md5.hexdigest()
     d = {"id": chunck_id, "content_ltks": rag_tokenizer.tokenize(req["content_with_weight"]),
          "content_with_weight": req["content_with_weight"]}
     d["content_sm_ltks"] = rag_tokenizer.fine_grained_tokenize(d["content_ltks"])
     d["important_kwd"] = req.get("important_kwd", [])
     d["important_tks"] = rag_tokenizer.tokenize(" ".join(req.get("important_kwd", [])))
-    d["question_kwd"] = req.get("question_kwd", [])
-    d["question_tks"] = rag_tokenizer.tokenize("\n".join(req.get("question_kwd", [])))
     d["create_time"] = str(datetime.datetime.now()).replace("T", " ")[:19]
     d["create_timestamp_flt"] = datetime.datetime.now().timestamp()
 
@@ -225,23 +222,16 @@ def create():
             return get_data_error_result(message="Document not found!")
         d["kb_id"] = [doc.kb_id]
         d["docnm_kwd"] = doc.name
-        d["title_tks"] = rag_tokenizer.tokenize(doc.name)
         d["doc_id"] = doc.id
 
         tenant_id = DocumentService.get_tenant_id(req["doc_id"])
         if not tenant_id:
             return get_data_error_result(message="Tenant not found!")
 
-        e, kb = KnowledgebaseService.get_by_id(doc.kb_id)
-        if not e:
-            return get_data_error_result(message="Knowledgebase not found!")
-        if kb.pagerank:
-            d["pagerank_fea"] = kb.pagerank
-
         embd_id = DocumentService.get_embd_id(req["doc_id"])
         embd_mdl = LLMBundle(tenant_id, LLMType.EMBEDDING.value, embd_id)
 
-        v, c = embd_mdl.encode([doc.name, req["content_with_weight"] if not d["question_kwd"] else "\n".join(d["question_kwd"])])
+        v, c = embd_mdl.encode([doc.name, req["content_with_weight"]])
         v = 0.1 * v[0] + 0.9 * v[1]
         d["q_%d_vec" % len(v)] = v.tolist()
         settings.docStoreConn.insert([d], search.index_name(tenant_id), doc.kb_id)
@@ -253,7 +243,7 @@ def create():
         return server_error_response(e)
 
 
-@manager.route('/retrieval_test', methods=['POST'])  # noqa: F821
+@manager.route('/retrieval_test', methods=['POST'])
 @login_required
 @validate_request("kb_id", "question")
 def retrieval_test():
@@ -312,7 +302,7 @@ def retrieval_test():
         return server_error_response(e)
 
 
-@manager.route('/knowledge_graph', methods=['GET'])  # noqa: F821
+@manager.route('/knowledge_graph', methods=['GET'])
 @login_required
 def knowledge_graph():
     doc_id = request.args["doc_id"]

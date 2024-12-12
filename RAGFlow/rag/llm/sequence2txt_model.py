@@ -15,9 +15,12 @@
 #
 import requests
 from openai.lib.azure import AzureOpenAI
+from zhipuai import ZhipuAI
 import io
 from abc import ABC
+from ollama import Client
 from openai import OpenAI
+import os
 import json
 from rag.utils import num_tokens_from_string
 import base64
@@ -46,8 +49,7 @@ class Base(ABC):
 
 class GPTSeq2txt(Base):
     def __init__(self, key, model_name="whisper-1", base_url="https://api.openai.com/v1"):
-        if not base_url:
-            base_url = "https://api.openai.com/v1"
+        if not base_url: base_url = "https://api.openai.com/v1"
         self.client = OpenAI(api_key=key, base_url=base_url)
         self.model_name = model_name
 

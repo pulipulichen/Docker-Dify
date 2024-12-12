@@ -13,8 +13,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #
+import logging
 import json
 import traceback
+from functools import partial
 from flask import request, Response
 from flask_login import login_required, current_user
 from api.db.services.canvas_service import CanvasTemplateService, UserCanvasService
@@ -25,13 +27,13 @@ from agent.canvas import Canvas
 from peewee import MySQLDatabase, PostgresqlDatabase
 
 
-@manager.route('/templates', methods=['GET'])  # noqa: F821
+@manager.route('/templates', methods=['GET'])
 @login_required
 def templates():
     return get_json_result(data=[c.to_dict() for c in CanvasTemplateService.get_all()])
 
 
-@manager.route('/list', methods=['GET'])  # noqa: F821
+@manager.route('/list', methods=['GET'])
 @login_required
 def canvas_list():
     return get_json_result(data=sorted([c.to_dict() for c in \
@@ -39,7 +41,7 @@ def canvas_list():
                            )
 
 
-@manager.route('/rm', methods=['POST'])  # noqa: F821
+@manager.route('/rm', methods=['POST'])
 @validate_request("canvas_ids")
 @login_required
 def rm():
@@ -52,19 +54,18 @@ def rm():
     return get_json_result(data=True)
 
 
-@manager.route('/set', methods=['POST'])  # noqa: F821
+@manager.route('/set', methods=['POST'])
 @validate_request("dsl", "title")
 @login_required
 def save():
     req = request.json
     req["user_id"] = current_user.id
-    if not isinstance(req["dsl"], str):
-        req["dsl"] = json.dumps(req["dsl"], ensure_ascii=False)
+    if not isinstance(req["dsl"], str): req["dsl"] = json.dumps(req["dsl"], ensure_ascii=False)
 
     req["dsl"] = json.loads(req["dsl"])
     if "id" not in req:
         if UserCanvasService.query(user_id=current_user.id, title=req["title"].strip()):
-            return get_data_error_result(f"{req['title'].strip()} already exists.")
+            return server_error_response(ValueError("Duplicated title."))
         req["id"] = get_uuid()
         if not UserCanvasService.save(**req):
             return get_data_error_result(message="Fail to save canvas.")
@@ -77,7 +78,7 @@ def save():
     return get_json_result(data=req)
 
 
-@manager.route('/get/<canvas_id>', methods=['GET'])  # noqa: F821
+@manager.route('/get/<canvas_id>', methods=['GET'])
 @login_required
 def get(canvas_id):
     e, c = UserCanvasService.get_by_id(canvas_id)
@@ -86,7 +87,7 @@ def get(canvas_id):
     return get_json_result(data=c.to_dict())
 
 
-@manager.route('/completion', methods=['POST'])  # noqa: F821
+@manager.route('/completion', methods=['POST'])
 @validate_request("id")
 @login_required
 def run():
@@ -152,8 +153,7 @@ def run():
         return resp
 
     for answer in canvas.run(stream=False):
-        if answer.get("running_status"):
-            continue
+        if answer.get("running_status"): continue
         final_ans["content"] = "\n".join(answer["content"]) if "content" in answer else ""
         canvas.messages.append({"role": "assistant", "content": final_ans["content"], "id": message_id})
         if final_ans.get("reference"):
@@ -163,7 +163,7 @@ def run():
         return get_json_result(data={"answer": final_ans["content"], "reference": final_ans.get("reference", [])})
 
 
-@manager.route('/reset', methods=['POST'])  # noqa: F821
+@manager.route('/reset', methods=['POST'])
 @validate_request("id")
 @login_required
 def reset():
@@ -186,51 +186,7 @@ def reset():
         return server_error_response(e)
 
 
-@manager.route('/input_elements', methods=['GET'])  # noqa: F821
-@login_required
-def input_elements():
-    cvs_id = request.args.get("id")
-    cpn_id = request.args.get("component_id")
-    try:
-        e, user_canvas = UserCanvasService.get_by_id(cvs_id)
-        if not e:
-            return get_data_error_result(message="canvas not found.")
-        if not UserCanvasService.query(user_id=current_user.id, id=cvs_id):
-            return get_json_result(
-                data=False, message='Only owner of canvas authorized for this operation.',
-                code=RetCode.OPERATING_ERROR)
-
-        canvas = Canvas(json.dumps(user_canvas.dsl), current_user.id)
-        return get_json_result(data=canvas.get_component_input_elements(cpn_id))
-    except Exception as e:
-        return server_error_response(e)
-
-
-@manager.route('/debug', methods=['POST'])  # noqa: F821
-@validate_request("id", "component_id", "params")
-@login_required
-def debug():
-    req = request.json
-    for p in req["params"]:
-        assert p.get("key")
-    try:
-        e, user_canvas = UserCanvasService.get_by_id(req["id"])
-        if not e:
-            return get_data_error_result(message="canvas not found.")
-        if not UserCanvasService.query(user_id=current_user.id, id=req["id"]):
-            return get_json_result(
-                data=False, message='Only owner of canvas authorized for this operation.',
-                code=RetCode.OPERATING_ERROR)
-
-        canvas = Canvas(json.dumps(user_canvas.dsl), current_user.id)
-        canvas.get_component(req["component_id"])["obj"]._param.debug_inputs = req["params"]
-        df = canvas.get_component(req["component_id"])["obj"].debug()
-        return get_json_result(data=df.to_dict(orient="records"))
-    except Exception as e:
-        return server_error_response(e)
-
-
-@manager.route('/test_db_connect', methods=['POST'])  # noqa: F821
+@manager.route('/test_db_connect', methods=['POST'])
 @validate_request("db_type", "database", "username", "host", "port", "password")
 @login_required
 def test_db_connect():
@@ -242,26 +198,8 @@ def test_db_connect():
         elif req["db_type"] == 'postgresql':
             db = PostgresqlDatabase(req["database"], user=req["username"], host=req["host"], port=req["port"],
                                     password=req["password"])
-        elif req["db_type"] == 'mssql':
-            import pyodbc
-            connection_string = (
-                f"DRIVER={{ODBC Driver 17 for SQL Server}};"
-                f"SERVER={req['host']},{req['port']};"
-                f"DATABASE={req['database']};"
-                f"UID={req['username']};"
-                f"PWD={req['password']};"
-            )
-            db = pyodbc.connect(connection_string)
-            cursor = db.cursor()
-            cursor.execute("SELECT 1")
-            cursor.close()
-        else:
-            return server_error_response("Unsupported database type.")
-        if req["db_type"] != 'mssql':
-            db.connect()
+        db.connect()
         db.close()
-        
         return get_json_result(data="Database Connection Successful!")
     except Exception as e:
         return server_error_response(e)
-

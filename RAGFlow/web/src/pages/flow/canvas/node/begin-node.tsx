@@ -1,4 +1,3 @@
-import { useTheme } from '@/components/theme-provider';
 import { Flex } from 'antd';
 import classNames from 'classnames';
 import get from 'lodash/get';
@@ -19,16 +18,12 @@ import styles from './index.less';
 export function BeginNode({ selected, data }: NodeProps<NodeData>) {
   const { t } = useTranslation();
   const query: BeginQuery[] = get(data, 'form.query', []);
-  const { theme } = useTheme();
+
   return (
     <section
-      className={classNames(
-        styles.ragNode,
-        theme === 'dark' ? styles.dark : '',
-        {
-          [styles.selectedNode]: selected,
-        },
-      )}
+      className={classNames(styles.ragNode, {
+        [styles.selectedNode]: selected,
+      })}
     >
       <Handle
         type="source"

@@ -75,8 +75,8 @@ The [.env](./.env) file contains important environment variables for Docker.
 - `RAGFLOW-IMAGE`  
   The Docker image edition. Available editions:  
   
-  - `infiniflow/ragflow:v0.14.1-slim` (default): The RAGFlow Docker image without embedding models.  
-  - `infiniflow/ragflow:v0.14.1`: The RAGFlow Docker image with embedding models including:
+  - `infiniflow/ragflow:dev-slim` (default): The RAGFlow Docker image without embedding models.  
+  - `infiniflow/ragflow:dev`: The RAGFlow Docker image with embedding models including:
     - Built-in embedding models:
       - `BAAI/bge-large-zh-v1.5` 
       - `BAAI/bge-reranker-v2-m3`
@@ -95,12 +95,12 @@ The [.env](./.env) file contains important environment variables for Docker.
 > [!TIP]  
 > If you cannot download the RAGFlow Docker image, try the following mirrors.  
 > 
-> - For the `nightly-slim` edition:  
->   - `RAGFLOW_IMAGE=swr.cn-north-4.myhuaweicloud.com/infiniflow/ragflow:nightly-slim` or,
->   - `RAGFLOW_IMAGE=registry.cn-hangzhou.aliyuncs.com/infiniflow/ragflow:nightly-slim`.
-> - For the `nightly` edition:  
->   - `RAGFLOW_IMAGE=swr.cn-north-4.myhuaweicloud.com/infiniflow/ragflow:nightly` or,
->   - `RAGFLOW_IMAGE=registry.cn-hangzhou.aliyuncs.com/infiniflow/ragflow:nightly`.
+> - For the `dev-slim` edition:  
+>   - `RAGFLOW_IMAGE=swr.cn-north-4.myhuaweicloud.com/infiniflow/ragflow:dev-slim` or,
+>   - `RAGFLOW_IMAGE=registry.cn-hangzhou.aliyuncs.com/infiniflow/ragflow:dev-slim`.
+> - For the `dev` edition:  
+>   - `RAGFLOW_IMAGE=swr.cn-north-4.myhuaweicloud.com/infiniflow/ragflow:dev` or,
+>   - `RAGFLOW_IMAGE=registry.cn-hangzhou.aliyuncs.com/infiniflow/ragflow:dev`.
 
 ### Timezone
 
@@ -115,12 +115,12 @@ The [.env](./.env) file contains important environment variables for Docker.
 ### MacOS
 
 - `MACOS`  
-  Optimizations for macOS. It is disabled by default. You can uncomment this line if your OS is macOS.
+  Optimizations for MacOS. It is disabled by default. You can uncomment this line if your OS is MacOS.
 
 ### Maximum file size
 
 - `MAX_CONTENT_LENGTH`  
-  The maximum file size for each uploaded file, in bytes. You can uncomment this line if you wish to change the 128M file size limit. After making the change, ensure you update `client_max_body_size` in nginx/nginx.conf correspondingly.
+  The maximum file size for each uploaded file, in bytes. You can uncomment this line if you wish to change the 128M file size limit.
 
 ## 🐋 Service configuration
 
@@ -133,14 +133,14 @@ The [.env](./.env) file contains important environment variables for Docker.
 - `mysql`
   - `name`: The MySQL database name. Defaults to `rag_flow`.
   - `user`: The username for MySQL.
-  - `password`: The password for MySQL.
+  - `password`: The password for MySQL. When updated, you must revise the `MYSQL_PASSWORD` variable in [.env](./.env) accordingly.
   - `port`: The MySQL serving port inside the Docker container. Defaults to `3306`.
   - `max_connections`: The maximum number of concurrent connections to the MySQL database. Defaults to `100`.
   - `stale_timeout`: Timeout in seconds.
 
 - `minio`
-  - `user`: The username for MinIO.
-  - `password`: The password for MinIO.
+  - `user`: The username for MinIO. When updated, you must revise the `MINIO_USER` variable in [.env](./.env) accordingly.
+  - `password`: The password for MinIO. When updated, you must revise the `MINIO_PASSWORD` variable in [.env](./.env) accordingly.
   - `host`: The MinIO serving IP *and* port inside the Docker container. Defaults to `minio:9000`.
 
 - `oauth`  

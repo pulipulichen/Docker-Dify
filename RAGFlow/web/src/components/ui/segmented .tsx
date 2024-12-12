@@ -47,10 +47,8 @@ export function Segmented({
             key={actualValue}
             className={cn(
               'inline-flex items-center px-3 py-2 text-sm font-medium rounded-sm cursor-pointer',
-              {
-                'bg-colors-background-inverse-strong': value === actualValue,
-                'text-colors-text-inverse-strong': value === actualValue,
-              },
+
+              { 'bg-backgroundCoreStandard': value === actualValue },
             )}
             onClick={() => onChange?.(actualValue)}
           >
