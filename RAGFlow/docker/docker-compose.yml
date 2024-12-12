@@ -3,9 +3,9 @@ include:
 
 services:
   ragflow:
-    depends_on:
-      mysql:
-        condition: service_healthy
+    # depends_on:
+    #   mysql:
+    #     condition: service_healthy
     image: ${RAGFLOW_IMAGE}
     container_name: ragflow-server
     ports:
@@ -27,5 +27,5 @@ services:
     restart: on-failure
     # https://docs.docker.com/engine/daemon/prometheus/#create-a-prometheus-configuration
     # If you're using Docker Desktop, the --add-host flag is optional. This flag makes sure that the host's internal IP gets exposed to the Prometheus container. 
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"
