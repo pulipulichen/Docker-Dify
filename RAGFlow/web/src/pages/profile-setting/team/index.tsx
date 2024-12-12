@@ -28,11 +28,11 @@ const TeamManagement = () => {
   };
 
   return (
-    <div className="p-8 ">
-      <div className=" mx-auto">
+    <div className="min-h-screen text-white p-8 ">
+      <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-4xl font-bold">Team management</h1>
-          <Button variant={'tertiary'} size={'sm'}>
+          <Button className="hover:bg-[#6B4FD8] text-white bg-colors-background-core-standard">
             <Plus className="mr-2 h-4 w-4" />
             Create team
           </Button>

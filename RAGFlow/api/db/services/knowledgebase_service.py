@@ -16,7 +16,6 @@
 from api.db import StatusEnum, TenantPermission
 from api.db.db_models import Knowledgebase, DB, Tenant, User, UserTenant,Document
 from api.db.services.common_service import CommonService
-from peewee import fn
 
 
 class KnowledgebaseService(CommonService):
@@ -35,7 +34,7 @@ class KnowledgebaseService(CommonService):
     @classmethod
     @DB.connection_context()
     def get_by_tenant_ids(cls, joined_tenant_ids, user_id,
-                          page_number, items_per_page, orderby, desc, keywords):
+                          page_number, items_per_page, orderby, desc):
         fields = [
             cls.model.id,
             cls.model.avatar,
@@ -52,31 +51,20 @@ class KnowledgebaseService(CommonService):
             User.avatar.alias('tenant_avatar'),
             cls.model.update_time
         ]
-        if keywords:
-            kbs = cls.model.select(*fields).join(User, on=(cls.model.tenant_id == User.id)).where(
-                ((cls.model.tenant_id.in_(joined_tenant_ids) & (cls.model.permission ==
-                                                                TenantPermission.TEAM.value)) | (
-                    cls.model.tenant_id == user_id))
-                & (cls.model.status == StatusEnum.VALID.value),
-                (fn.LOWER(cls.model.name).contains(keywords.lower()))
-            )
-        else:
-            kbs = cls.model.select(*fields).join(User, on=(cls.model.tenant_id == User.id)).where(
-                ((cls.model.tenant_id.in_(joined_tenant_ids) & (cls.model.permission ==
-                                                                TenantPermission.TEAM.value)) | (
-                    cls.model.tenant_id == user_id))
-                & (cls.model.status == StatusEnum.VALID.value)
-            )
+        kbs = cls.model.select(*fields).join(User, on=(cls.model.tenant_id == User.id)).where(
+            ((cls.model.tenant_id.in_(joined_tenant_ids) & (cls.model.permission ==
+                                                            TenantPermission.TEAM.value)) | (
+                     cls.model.tenant_id == user_id))
+            & (cls.model.status == StatusEnum.VALID.value)
+        )
         if desc:
             kbs = kbs.order_by(cls.model.getter_by(orderby).desc())
         else:
             kbs = kbs.order_by(cls.model.getter_by(orderby).asc())
 
-        count = kbs.count()
-
         kbs = kbs.paginate(page_number, items_per_page)
 
-        return list(kbs.dicts()), count
+        return list(kbs.dicts())
 
     @classmethod
     @DB.connection_context()

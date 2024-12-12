@@ -48,7 +48,6 @@ EmbeddingModel = {
     "BaiduYiyan": BaiduYiyanEmbed,
     "Voyage AI": VoyageEmbed,
     "HuggingFace": HuggingFaceEmbed,
-    "VolcEngine":VolcEngineEmbed,
 }
 
 CvModel = {

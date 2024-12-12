@@ -2,7 +2,7 @@ import EditTag from '@/components/edit-tag';
 import { useFetchChunk } from '@/hooks/chunk-hooks';
 import { IModalProps } from '@/interfaces/common';
 import { DeleteOutlined } from '@ant-design/icons';
-import { Divider, Form, Input, Modal, Space, Switch } from 'antd';
+import { Checkbox, Divider, Form, Input, Modal, Space } from 'antd';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDeleteChunkByIds } from '../../hooks';
@@ -31,14 +31,9 @@ const ChunkCreatingModal: React.FC<IModalProps<any> & kFProps> = ({
 
   useEffect(() => {
     if (data?.code === 0) {
-      const {
-        content_with_weight,
-        important_kwd = [],
-        available_int,
-      } = data.data;
+      const { content_with_weight, important_kwd = [] } = data.data;
       form.setFieldsValue({ content: content_with_weight });
       setKeywords(important_kwd);
-      setChecked(available_int === 1);
     }
 
     if (!chunkId) {
@@ -53,7 +48,6 @@ const ChunkCreatingModal: React.FC<IModalProps<any> & kFProps> = ({
       onOk?.({
         content: values.content,
         keywords, // keywords
-        available_int: checked ? 1 : 0, // available_int
       });
     } catch (errorInfo) {
       console.log('Failed:', errorInfo);
@@ -88,19 +82,16 @@ const ChunkCreatingModal: React.FC<IModalProps<any> & kFProps> = ({
         </Form.Item>
       </Form>
       <section>
-        <p className="mb-2">{t('chunk.keyword')} *</p>
+        <p>{t('chunk.keyword')} *</p>
         <EditTag tags={keywords} setTags={setKeywords} />
       </section>
       {chunkId && (
         <section>
           <Divider></Divider>
           <Space size={'large'}>
-            <Switch
-              checkedChildren={t('chunk.enabled')}
-              unCheckedChildren={t('chunk.disabled')}
-              onChange={handleCheck}
-              checked={checked}
-            />
+            <Checkbox onChange={handleCheck} checked={checked}>
+              {t('chunk.enabled')}
+            </Checkbox>
 
             <span onClick={handleRemove}>
               <DeleteOutlined /> {t('common.delete')}

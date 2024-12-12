@@ -75,7 +75,6 @@ export default {
       namePlaceholder: '請輸入名稱',
       doc: '文件',
       searchKnowledgePlaceholder: '搜索',
-      noMoreData: 'It is all, nothing more',
     },
     knowledgeDetails: {
       dataset: '數據集',
@@ -296,7 +295,7 @@ export default {
       search: '搜尋',
       all: '所有',
       enabled: '啟用',
-      disabled: '禁用',
+      disabled: '禁用的',
       keyword: '關鍵詞',
       function: '函數',
       chunkMessage: '請輸入值！',

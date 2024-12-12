@@ -4,8 +4,6 @@ export enum KnowledgeRouteKey {
   Configuration = 'configuration',
 }
 
-export const DatasetBaseKey = 'dataset';
-
 export enum RunningStatus {
   UNSTART = '0', // need to run
   RUNNING = '1', // need to cancel

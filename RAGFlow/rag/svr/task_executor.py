@@ -114,7 +114,6 @@ def set_progress(task_id, from_page=0, to_page=-1, prog=None, msg="Processing...
     if prog is not None:
         d["progress"] = prog
     try:
-        logging.info(f"set_progress({task_id}), progress: {prog}, progress_msg: {msg}")
         TaskService.update_progress(task_id, d)
     except Exception:
         logging.exception(f"set_progress({task_id}) got exception")
@@ -493,7 +492,6 @@ def report_status():
             logging.exception("report_status got exception")
         time.sleep(30)
 
-
 def analyze_heap(snapshot1: tracemalloc.Snapshot, snapshot2: tracemalloc.Snapshot, snapshot_id: int, dump_full: bool):
     msg = ""
     if dump_full:
@@ -509,7 +507,6 @@ def analyze_heap(snapshot1: tracemalloc.Snapshot, snapshot2: tracemalloc.Snapsho
     for stat in stats1_vs_2[:3]:
         msg += '\n'.join(stat.traceback.format())
     logging.info(msg)
-
 
 def main():
     settings.init_settings()

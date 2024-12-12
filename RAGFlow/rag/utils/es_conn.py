@@ -85,9 +85,6 @@ class ESConnection(DocStoreConnection):
             logging.exception("ESConnection.createIndex error %s" % (indexName))
 
     def deleteIdx(self, indexName: str, knowledgebaseId: str):
-        if len(knowledgebaseId) > 0:
-            # The index need to be alive after any kb deletion since all kb under this tenant are in one index.
-            return
         try:
             self.es.indices.delete(index=indexName, allow_no_indices=True)
         except NotFoundError:
@@ -151,9 +148,9 @@ class ESConnection(DocStoreConnection):
                 vector_similarity_weight = float(weights.split(",")[1])
         for m in matchExprs:
             if isinstance(m, MatchTextExpr):
-                minimum_should_match = m.extra_options.get("minimum_should_match", 0.0)
-                if isinstance(minimum_should_match, float):
-                    minimum_should_match = str(int(minimum_should_match * 100)) + "%"
+                minimum_should_match = "0%"
+                if "minimum_should_match" in m.extra_options:
+                    minimum_should_match = str(int(m.extra_options["minimum_should_match"] * 100)) + "%"
                 bqry.must.append(Q("query_string", fields=m.fields,
                                    type="best_fields", query=m.matching_text,
                                    minimum_should_match=minimum_should_match,
@@ -218,11 +215,11 @@ class ESConnection(DocStoreConnection):
                                   id=chunkId, source=True, )
                 if str(res.get("timed_out", "")).lower() == "true":
                     raise Exception("Es Timeout.")
+                if not res.get("found"):
+                    return None
                 chunk = res["_source"]
                 chunk["id"] = chunkId
                 return chunk
-            except NotFoundError:
-                return None
             except Exception as e:
                 logging.exception(f"ESConnection.get({chunkId}) got exception")
                 if str(e).find("Timeout") > 0:
@@ -297,7 +294,7 @@ class ESConnection(DocStoreConnection):
                         f"Condition `{str(k)}={str(v)}` value type is {str(type(v))}, expected to be int, str or list.")
             scripts = []
             for k, v in newValue.items():
-                if (not isinstance(k, str) or not v) and k != "available_int":
+                if not isinstance(k, str) or not v:
                     continue
                 if isinstance(v, str):
                     scripts.append(f"ctx._source.{k} = '{v}'")
@@ -403,7 +400,7 @@ class ESConnection(DocStoreConnection):
             if not hlts:
                 continue
             txt = "...".join([a for a in list(hlts.items())[0][1]])
-            if not is_english(txt.split()):
+            if not is_english(txt.split(" ")):
                 ans[d["_id"]] = txt
                 continue
 
