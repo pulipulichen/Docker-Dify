@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  doc_knowledgebase:
+    build: .
+    volumes:
+      - ./html:/DocKnowledgeBase/html
+      - ./index.js:/DocKnowledgeBase/index.js
+    ports:
+      - "21080:8181"
+    restart: always
+    entrypoint: ["node", "/DocKnowledgeBase/index.js"]
