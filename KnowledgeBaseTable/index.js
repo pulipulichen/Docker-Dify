@@ -32,7 +32,7 @@ app.get('/', async (req, res) => {
                 .filter(header => row[header].trim() !== "") // 過濾掉空值欄位
                 .map(header => `"${header}":"${row[header]}"`)
                 .join(';');
-        }).join('\n');
+        }).join('\n\n----\n\n');
 
         // 回傳結果
         res.send(result);
