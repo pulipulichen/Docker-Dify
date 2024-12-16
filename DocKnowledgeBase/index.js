@@ -50,11 +50,48 @@ function generateHTML() {
     `;
 }
 
+// 動態生成 sitemap.xml
+function generateSitemap() {
+  let urls = '';
+
+  // 遍歷 HTML 資料夾，生成每個檔案的 <url>
+  fs.readdirSync(HTML_FOLDER)
+      .filter(file => path.extname(file) === '.html') // 篩選 HTML 檔案
+      .forEach(file => {
+          const filePath = path.join(HTML_FOLDER, file);
+          const stats = fs.statSync(filePath);
+
+          urls += `
+          <url>
+              <loc>${HOST}${file}</loc>
+              <lastmod>${stats.mtime.toISOString()}</lastmod>
+              <changefreq>weekly</changefreq>
+              <priority>0.8</priority>
+          </url>
+          `;
+      });
+
+  // 包裝成完整的 sitemap.xml
+  return `
+  <?xml version="1.0" encoding="UTF-8"?>
+  <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+      ${urls}
+  </urlset>
+  `.trim();
+}
+
 // 提供動態生成的 HTML 頁面
 app.get('/', (req, res) => {
     const html = generateHTML();
     res.set('Content-Type', 'text/html');
     res.send(html);
+});
+
+// 提供 sitemap.xml
+app.get('/sitemap.xml', (req, res) => {
+  const sitemap = generateSitemap();
+  res.set('Content-Type', 'application/xml');
+  res.send(sitemap);
 });
 
 // 提供 HTML 資料夾的靜態檔案
