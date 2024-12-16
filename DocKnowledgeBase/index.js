@@ -21,10 +21,10 @@ function generateHTML() {
             const stats = fs.statSync(filePath);
 
             articles += `
-            <article>
+            <li><article>
                 <h2><a href="${HOST}${file}" target="_blank">${file}</a></h2>
                 <p>Last modified: ${stats.mtime}</p>
-            </article>
+            </article></li>
             `;
         });
 
@@ -47,7 +47,7 @@ function generateHTML() {
     </head>
     <body>
         <h1>HTML File List</h1>
-        ${articles}
+        <ul>${articles}</ul>
     </body>
     </html>
     `;
