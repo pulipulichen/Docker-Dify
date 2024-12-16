@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# Get the directory path of the script
+script_dir=$(dirname "$0")
+
+# Change the current working directory to the script's location
+cd "$script_dir"
+
+# =================
+
 # Check if libreoffice is installed
 if ! command -v libreoffice &> /dev/null; then
   echo "Error: LibreOffice is not installed. Please install it (e.g., sudo apt-get install libreoffice)."
