@@ -4,9 +4,10 @@ services:
   doc_knowledgebase:
     build: .
     volumes:
-      - ./html:/DocKnowledgeBase/html
-      - ./index.js:/DocKnowledgeBase/index.js
+      - ./html:/app/html
+      - ./index.js:/app/index.js
     ports:
-      - "21080:8181"
+      # - "21080:8181"
+      - "21080:21080"
     restart: always
-    entrypoint: ["node", "/DocKnowledgeBase/index.js"]
+    entrypoint: ["node", "/app/index.js"]

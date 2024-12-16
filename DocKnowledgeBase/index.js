@@ -1,15 +1,56 @@
-var liveServer = require("live-server");
+const express = require('express');
+const fs = require('fs');
+const path = require('path');
+const RSS = require('rss');
 
-var params = {
-	port: 8181, // Set the server port. Defaults to 8080.
-	host: "0.0.0.0", // Set the address to bind to. Defaults to 0.0.0.0 or process.env.IP.
-	root: "/DocKnowledgeBase/html", // Set root directory that's being served. Defaults to cwd.
-	open: false, // When false, it won't load your browser by default.
-	ignore: 'scss,my/templates', // comma-separated string for paths to ignore
-	// file: "index.html", // When set, serve this file (server root relative) for every 404 (useful for single-page applications)
-	wait: 1000, // Waits for all changes, before reloading. Defaults to 0 sec.
-	// mount: [['/components', './node_modules']], // Mount a directory to a route.
-	// logLevel: 2, // 0 = errors only, 1 = some, 2 = lots
-	// middleware: [function(req, res, next) { next(); }] // Takes an array of Connect-compatible middleware that are injected into the server middleware stack
-};
-liveServer.start(params);
+const app = express();
+const PORT = 21080;
+const HOST = `http://192.168.100.195:21080/`
+
+// HTML 檔案所在的資料夾
+const HTML_FOLDER = path.join(__dirname, 'html');
+
+// RSS 資訊
+const feed = new RSS({
+    title: 'HTML Files RSS Feed',
+    description: 'RSS feed generated from HTML files',
+    feed_url: `${HOST}rss`,
+    site_url: HOST,
+    language: 'zh-tw',
+    pubDate: new Date(),
+});
+
+// 遍歷 HTML 資料夾，將每個檔案加入 RSS
+fs.readdir(HTML_FOLDER, (err, files) => {
+    if (err) {
+        console.error('Error reading HTML folder:', err);
+        return;
+    }
+
+    files.filter(file => path.extname(file) === '.html').forEach(file => {
+        const filePath = path.join(HTML_FOLDER, file);
+        const stats = fs.statSync(filePath);
+
+        feed.item({
+            title: file,
+            description: `HTML file: ${file}`,
+            url: `${HOST}${file}`, // 生成對應的 URL
+            date: stats.mtime, // 檔案的最後修改時間
+        });
+    });
+});
+
+// 提供 RSS feed
+app.get('/rss', (req, res) => {
+    res.set('Content-Type', 'application/rss+xml');
+    res.send(feed.xml());
+});
+
+// 提供 HTML 資料夾的靜態檔案
+app.use(express.static(HTML_FOLDER));
+
+// 啟動伺服器
+app.listen(PORT, () => {
+    console.log(`Server is running at ${HOST}`);
+    console.log(`RSS feed available at ${HOST}rss`);
+});

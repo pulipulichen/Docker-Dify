@@ -21,7 +21,9 @@ FROM node:14.21.3-bullseye
 # RUN apt-get clean 
 # RUN apt update
 
-RUN mkdir -p /DocKnowledgeBase
-WORKDIR /DocKnowledgeBase
+RUN mkdir -p /app
+WORKDIR /app
 
 RUN npm link live-server
+RUN npm link rss
+RUN npm link express
