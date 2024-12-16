@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  knowledge_base_table:
+    build: .
+    volumes:
+      - ./index.js:/app/index.js
+    ports:
+      - "31080:31080"
+    restart: always
+    entrypoint: ["node", "/app/index.js"]
