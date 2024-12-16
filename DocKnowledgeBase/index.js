@@ -5,7 +5,7 @@ const RSS = require('rss');
 
 const app = express();
 const PORT = 21080;
-const HOST = `http://192.168.100.195:21080/`
+const HOST = `http://192.168.100.202:21080/`
 
 // HTML 檔案所在的資料夾
 const HTML_FOLDER = path.join(__dirname, 'html');
