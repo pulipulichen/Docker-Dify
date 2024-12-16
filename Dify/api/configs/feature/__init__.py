@@ -439,6 +439,17 @@ class WorkflowConfig(BaseSettings):
     )
 
 
+class WorkflowNodeExecutionConfig(BaseSettings):
+    """
+    Configuration for workflow node execution
+    """
+
+    MAX_SUBMIT_COUNT: PositiveInt = Field(
+        description="Maximum number of submitted thread count in a ThreadPool for parallel node execution",
+        default=100,
+    )
+
+
 class AuthConfig(BaseSettings):
     """
     Configuration for authentication and OAuth
@@ -626,8 +637,6 @@ class DataSetConfig(BaseSettings):
         default=30,
     )
 
-    RETRIEVAL_TOP_N: int = Field(description="number of retrieval top_n", default=0)
-
 
 class WorkspaceConfig(BaseSettings):
     """
@@ -647,7 +656,7 @@ class IndexingConfig(BaseSettings):
 
     INDEXING_MAX_SEGMENTATION_TOKENS_LENGTH: PositiveInt = Field(
         description="Maximum token length for text segmentation during indexing",
-        default=1000,
+        default=4000,
     )
 
 
@@ -777,6 +786,7 @@ class FeatureConfig(
     ToolConfig,
     UpdateConfig,
     WorkflowConfig,
+    WorkflowNodeExecutionConfig,
     WorkspaceConfig,
     LoginConfig,
     # hosted services config

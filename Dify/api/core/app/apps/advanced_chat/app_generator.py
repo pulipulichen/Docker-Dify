@@ -3,7 +3,7 @@ import logging
 import threading
 import uuid
 from collections.abc import Generator, Mapping
-from typing import Any, Optional, Union
+from typing import Any, Literal, Optional, Union, overload
 
 from flask import Flask, current_app
 from pydantic import ValidationError
@@ -23,6 +23,7 @@ from core.app.entities.app_invoke_entities import AdvancedChatAppGenerateEntity,
 from core.app.entities.task_entities import ChatbotAppBlockingResponse, ChatbotAppStreamResponse
 from core.model_runtime.errors.invoke import InvokeAuthorizationError, InvokeError
 from core.ops.ops_trace_manager import TraceQueueManager
+from core.prompt.utils.get_thread_messages_length import get_thread_messages_length
 from extensions.ext_database import db
 from factories import file_factory
 from models.account import Account
@@ -33,6 +34,31 @@ logger = logging.getLogger(__name__)
 
 
 class AdvancedChatAppGenerator(MessageBasedAppGenerator):
+    _dialogue_count: int
+
+    @overload
+    def generate(
+        self,
+        app_model: App,
+        workflow: Workflow,
+        user: Union[Account, EndUser],
+        args: Mapping[str, Any],
+        invoke_from: InvokeFrom,
+        streaming: Literal[True],
+    ) -> Generator[str, None, None]: ...
+
+    @overload
+    def generate(
+        self,
+        app_model: App,
+        workflow: Workflow,
+        user: Union[Account, EndUser],
+        args: Mapping[str, Any],
+        invoke_from: InvokeFrom,
+        streaming: Literal[False],
+    ) -> Mapping[str, Any]: ...
+
+    @overload
     def generate(
         self,
         app_model: App,
@@ -41,7 +67,17 @@ class AdvancedChatAppGenerator(MessageBasedAppGenerator):
         args: Mapping[str, Any],
         invoke_from: InvokeFrom,
         streaming: bool = True,
-    ) -> Mapping[str, Any] | Generator[str, None, None]:
+    ) -> Union[Mapping[str, Any], Generator[str, None, None]]: ...
+
+    def generate(
+        self,
+        app_model: App,
+        workflow: Workflow,
+        user: Union[Account, EndUser],
+        args: Mapping[str, Any],
+        invoke_from: InvokeFrom,
+        streaming: bool = True,
+    ):
         """
         Generate App response.
 
@@ -211,6 +247,9 @@ class AdvancedChatAppGenerator(MessageBasedAppGenerator):
             db.session.commit()
             db.session.refresh(conversation)
 
+        # get conversation dialogue count
+        self._dialogue_count = get_thread_messages_length(conversation.id)
+
         # init queue manager
         queue_manager = MessageBasedAppQueueManager(
             task_id=application_generate_entity.task_id,
@@ -281,6 +320,7 @@ class AdvancedChatAppGenerator(MessageBasedAppGenerator):
                     queue_manager=queue_manager,
                     conversation=conversation,
                     message=message,
+                    dialogue_count=self._dialogue_count,
                 )
 
                 runner.run()
@@ -334,6 +374,7 @@ class AdvancedChatAppGenerator(MessageBasedAppGenerator):
             message=message,
             user=user,
             stream=stream,
+            dialogue_count=self._dialogue_count,
         )
 
         try:
