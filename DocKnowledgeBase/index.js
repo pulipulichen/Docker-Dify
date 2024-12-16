@@ -44,6 +44,7 @@ function generateHTML() {
     </head>
     <body>
         <h1>HTML File List</h1>
+        <a href="${HOST}sitemap.xml">sitemap.xml for Firecrawl</a>
         <ul>${articles}</ul>
     </body>
     </html>
