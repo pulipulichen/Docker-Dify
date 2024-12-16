@@ -38,7 +38,7 @@ app.get('/', async (req, res) => {
         res.send(result);
 
     } catch (error) {
-        console.error('處理Excel檔案時發生錯誤:', error);
+        // console.error('處理Excel檔案時發生錯誤:', error);
         res.status(500).send('無法處理Excel檔案，請確認網址是否有效');
     }
 });
