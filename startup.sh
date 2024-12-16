@@ -62,6 +62,18 @@ docker-compose up -d > /dev/null 2>&1
 
 # sleep 5
 
+echo $base_dir
+cd "$base_dir"
+# pwd
+cd ./KnowledgeBaseTable/
+
+docker-compose down
+docker-compose up -d > /dev/null 2>&1
+
+# ===========
+
+# sleep 5
+
 # # https://ithelp.ithome.com.tw/m/articles/10369119
 
 # # apt-get update
