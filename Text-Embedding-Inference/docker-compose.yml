@@ -3,7 +3,7 @@ services:
   api:
     image: ghcr.io/huggingface/text-embeddings-inference:1.6
     ports:
-      - 38085:80
+      - 38086:80
     environment:
       - MODEL_ID=Alibaba-NLP/gte-multilingual-reranker-base
       # ...
