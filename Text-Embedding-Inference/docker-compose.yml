@@ -1,0 +1,19 @@
+version: "3.9"
+services:
+  api:
+    image: ghcr.io/huggingface/text-embeddings-inference:1.6
+    ports:
+      - 38085:80
+    environment:
+      - MODEL_ID=Alibaba-NLP/gte-multilingual-reranker-base
+      # ...
+    volumes:
+      - ./data:/data
+    # decomment the following piece if running with Nvidia GPUs
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
