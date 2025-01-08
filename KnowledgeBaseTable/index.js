@@ -36,6 +36,9 @@ app.get('/', async (req, res) => {
         let start = (Number(len) * Number(p))
         for (let i = start; i < (start + len); i++) {
             let row = jsonData[i]
+            if (!row) {
+                break
+            }
             
             let json = headers
                 .filter(header => {
@@ -56,7 +59,7 @@ app.get('/', async (req, res) => {
         // 回傳結果
         res.send(result);
     } catch (error) {
-        // console.error('處理Excel檔案時發生錯誤:', error);        
+        console.error('處理Excel檔案時發生錯誤:', error);        
         res.status(500).send('無法處理Excel檔案，請確認網址是否有效');
     }
 });
