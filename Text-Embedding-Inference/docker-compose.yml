@@ -1,0 +1,27 @@
+version: "3.9"
+services:
+  api:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.6
+    ports:
+      - 38086:80
+    environment:
+      - MODEL_ID=BAAI/bge-reranker-large
+      # ...
+    volumes:
+      - ./data:/data
+    # decomment the following piece if running with Nvidia GPUs
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.199.0/24

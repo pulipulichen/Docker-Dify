@@ -79,7 +79,8 @@ cd "$base_dir"
 # pwd
 cd ./Text-Embedding-Inference/
 
-./startup.sh 2>&1
+docker-compose down
+docker-compose up -d > /dev/null 2>&1
 
 # ===========
 
