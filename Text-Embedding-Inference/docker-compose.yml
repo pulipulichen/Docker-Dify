@@ -5,7 +5,7 @@ services:
     ports:
       - 38086:80
     environment:
-      - MODEL_ID=Alibaba-NLP/gte-multilingual-reranker-base
+      - MODEL_ID=BAAI/bge-reranker-large
       # ...
     volumes:
       - ./data:/data
