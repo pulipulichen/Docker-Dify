@@ -6,9 +6,10 @@ const port = 31080;
 
 // GET 接收 Excel URL
 app.get('/', async (req, res) => {
-    const url = req.query.url;
-
+    const {url, len = 50, p = 0} = req.query;
+    // console.log(req.query)
     if (!url) {
+        // console.log(url)
         return res.status(400).send('請提供有效的Excel檔案網址');
     }
 
@@ -27,18 +28,35 @@ app.get('/', async (req, res) => {
         const headers = Object.keys(jsonData[0] || {});
 
         // 轉換資料格式
-        const result = jsonData.map(row => {
-            return headers
-                .filter(header => row[header].trim() !== "") // 過濾掉空值欄位
+        let result = []
+        // console.log({
+        //     i: (Number(len) * Number(p)),
+        //     l: jsonData.length
+        // })
+        let start = (Number(len) * Number(p))
+        for (let i = start; i < (start + len); i++) {
+            let row = jsonData[i]
+            
+            let json = headers
+                .filter(header => {
+                    if (!row[header]) {
+                        return false
+                    }
+                    return ((row[header] + '').trim() !== "")
+                }) // 過濾掉空值欄位
                 .map(header => `"${header}":"${row[header]}"`)
-                .join(';');
-        }).join('\n####\n');
+                .join(';\n')
+            result.push(json)
+        }
+        
+        result = result.join('\n####\n');
+
+        // console.log(result.length)
 
         // 回傳結果
         res.send(result);
-
     } catch (error) {
-        // console.error('處理Excel檔案時發生錯誤:', error);
+        // console.error('處理Excel檔案時發生錯誤:', error);        
         res.status(500).send('無法處理Excel檔案，請確認網址是否有效');
     }
 });

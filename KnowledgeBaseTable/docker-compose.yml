@@ -7,5 +7,5 @@ services:
       - ./index.js:/app/index.js
     ports:
       - "31080:31080"
-    restart: always
+    # restart: always
     entrypoint: ["node", "/app/index.js"]
