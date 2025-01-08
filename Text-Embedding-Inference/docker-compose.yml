@@ -17,3 +17,11 @@ services:
     #         - driver: nvidia
     #           count: 1
     #           capabilities: [gpu]
+
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.199.0/24
